@@ -1,9 +1,9 @@
 ## WIP: FastAPI Best Practices
 
 ### 1. Project Structure. Group files by module domain, not file types.
-I don't like the project structure presented by @tiangolo, 
-where we separate file by their type (e.g. api, crud, models, schemas).
-Structure that I find more scalable and evolvable is inspired by Netflix's [Dispatch](https://github.com/Netflix/dispatch_) with some little modifications.
+I didn't like the project structure presented by @tiangolo, 
+where we separate files by their type (e.g. api, crud, models, schemas).
+Structure that I find more scalable and evolvable is inspired by Netflix's [Dispatch](https://github.com/Netflix/dispatch) with some little modifications.
 ```
 fastapi-project
 ├── alembic/
@@ -70,7 +70,7 @@ fastapi-project
    9. `exceptions` - module specific exceptions, e.g. `PostNotFound`, `InvalidUserData`
 
 ### 2. Excessively use Pydantic
-Pydantic has a rich set of feature to validate and transform data. 
+Pydantic has a rich set of features to validate and transform data. 
 
 In addition to regular features like required, non-required fields and default data, 
 it has built-in comprehensive data processing params like regex, enums for limited allowed options, length validation, email validation, etc.
@@ -171,7 +171,7 @@ async def get_user_post(post: Mapping = Depends(valid_owned_post)):
     return post
 
 ```
-### 6. Decouple & reuse dependencies
+### 6. Decouple & Reuse dependencies. Dependency calls are cached.
 Depdencies can be reused multiple times and they won't be recalculated - FastAPI caches their result by default,
 i.e. if we have dependency which calls service `get_post_by_id`,
 we won't be visiting DB each time we call this dependency - only the first time.
