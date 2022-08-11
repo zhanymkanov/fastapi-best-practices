@@ -108,12 +108,12 @@ async def valid_post_id(post_id: UUID4) -> Mapping:
 
 # router.py
 @router.get("/posts/{post_id}", response_model=PostResponse)
-async def get_post(post: Mapping = Depends(valid_post_id)):
+async def get_post_by_id(post: Mapping = Depends(valid_post_id)):
     return post
 
 
 @router.put("/posts/{post_id}", response_model=PostResponse)
-async def get_post(
+async def update_post(
     update_data: PostUpdate,  
     post: Mapping = Depends(valid_post_id), 
 ):
@@ -122,7 +122,7 @@ async def get_post(
 
 
 @router.get("/posts/{post_id}/reviews", response_model=list[ReviewsResponse])
-async def get_post(post: Mapping = Depends(valid_post_id)):
+async def get_post_reviews(post: Mapping = Depends(valid_post_id)):
     post_reviews: list[Mapping] = await reviews_service.get_by_post_id(post["id"])
     return post_reviews
 ```
