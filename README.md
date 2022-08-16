@@ -55,7 +55,7 @@ fastapi-project
 ├── logging.ini
 └── alembic.ini
 ```
-1. Store all the module directories inside src folder
+1. Store all domain directories inside `src` folder
    1. `src/` - highest level of an app, contains common models, configs, and constants, etc.
    2. `src/main.py` - root of the project, which inits the FastAPI app
 2. Each package has its own router, schemas, models, etc.
