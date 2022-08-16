@@ -1,5 +1,5 @@
 ## WIP: FastAPI Best Practices
-
+Opinionated list of best practices and conventions we have developed after 1.5 years in production. 
 ### 1. Project Structure. Group files by module domain, not file types.
 I didn't like the project structure presented by @tiangolo, 
 where we separate files by their type (e.g. api, crud, models, schemas).
@@ -247,14 +247,13 @@ async def get_user_post(
 
 ```
 
-### 7. Follow REST
-Developing RESTfull API makes it easier to reuse dependencies
-Following REST leads us to reuse dependencies and  
+### 7. Follow the REST
+Developing RESTful API makes it easier to reuse dependencies in routes like these:
    1. `GET /courses/:course_id`
    2. `GET /courses/:course_id/chapters/:chapter_id/lessons`
    3. `GET /chapters/:chapter_id`
 
-The only caveat is to use the same variable names in the path,
+The only caveat is to use the same variable names in the path:
 - If you have two endpoints `GET /profiles/:profile_id` and `GET /creators/:creator_id`
 that both validate whether the given profile_id exists,  but `GET /creators/:creator_id`
 also checks if the profile is creator, then it's better to rename `creator_id` path variable to `profile_id` and chain those two dependencies.
@@ -371,7 +370,59 @@ In short, GIL allows only one thread to work at a time, which makes it useless f
 
 ### 9. Custom base model model from day 0, 
 convert datetime to common standard
-### 10. Hide docs by default. Show it explicitly on the selected envs
+### 10. Docs
+1. Unless your API is public, hide docs by default. Show it explicitly on the selected envs
+```python
+from fastapi import FastAPI
+from starlette.config import Config
+
+config = Config(".env")  # parse .env file for env variables
+
+ENVIRONMENT = config("ENVIRONMENT")  # get current env name
+SHOW_DOCS_ENVIRONMENT = ("local", "staging")  # explicit list of allowed envs
+
+app_configs = {"title": "My Cool API"}
+if ENVIRONMENT not in SHOW_DOCS_ENVIRONMENT:
+   app_configs["openapi_url"] = None  # set url for docs as null
+
+app = FastAPI(**app_configs)
+```
+2. Help FastAPI to generate an easy-to-understand docs
+   1. Set `response_model`, `status_code`, `description`, etc.
+   2. If models and statuses may vary, use `responses` route attribute to add docs for different responses
+```python
+from fastapi import APIRouter, status
+
+router = APIRouter()
+
+@router.post(
+    "/endpoints",
+    response_model=DefaultResponseModel,  # default response pydantic model 
+    status_code=status.HTTP_201_CREATED,  # default status code
+    description="Description of the well documented endpoint",
+    tags=["Resource_1", "Resource_2"],
+    summary="Summary of the Endpoint",
+    responses={
+        status.HTTP_200_OK: {
+            "model": OkResponse, # custom pydantic model for 200 response
+            "description": "Ok Response",
+        },
+        status.HTTP_201_CREATED: {
+            "model": CreatedResponse,  # custom pydantic model for 201 response
+            "description": "Creates something from user request ",
+        },
+        status.HTTP_202_ACCEPTED: {
+            "model": AcceptedResponse,  # custom pydantic model for 202 response
+            "description": "Accepts request and handles it later",
+        },
+    },
+)
+async def documented_route():
+    pass
+```
+Will generate docs like this:
+![FastAPI Generated Custom Response Docs](images/custom_responses.png "Custom Response Docs")
+
 ### 11. Use Starlette's Config object, instead of 3rd party ones - it's decent enough
 ### 12. Set DB keys naming convention immediately, from day 0
 ### 13. Set DB table naming convention immediately, from day 0
@@ -395,6 +446,6 @@ good for both async and sync routes
 ### 27. you can just raise a ValueError in pydantic schemas, if that's it faces user request. 
 it will return a nice response
 ### 28. don't forget that fastapi converts response Model to Dict then to Model then to JSON
-### 29. if no async lib, and poor documentation, then use asgiref
+### 29. if no async lib, and poor documentation, then use starlette's run_in_threadpool or asgiref
 ### 30. use linters (black, isort, autoflake)
 ### 31. set logs from day 0
