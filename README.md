@@ -82,7 +82,7 @@ In addition to regular features like required, non-required fields and default d
 it has built-in comprehensive data processing params like regex, enums for limited allowed options, length validation, email validation, etc.
 ```python3
 from enum import Enum
-from pydantic import BaseModel, constr, EmailStr, Field, AnyUrl
+from pydantic import AnyUrl, BaseModel, EmailStr, Field, constr
 
 class MusicBand(str, Enum):
    AEROSMITH = "AEROSMITH"
