@@ -371,7 +371,7 @@ In short, GIL allows only one thread to work at a time, which makes it useless f
 ### 9. Custom base model model from day 0, 
 convert datetime to common standard
 ### 10. Docs
-1. Unless your API is public, hide docs by default. Show it explicitly on the selected envs
+1. Unless your API is public, hide docs by default. Show it explicitly on the selected envs only.
 ```python
 from fastapi import FastAPI
 from starlette.config import Config
@@ -389,7 +389,7 @@ app = FastAPI(**app_configs)
 ```
 2. Help FastAPI to generate an easy-to-understand docs
    1. Set `response_model`, `status_code`, `description`, etc.
-   2. If models and statuses may vary, use `responses` route attribute to add docs for different responses
+   2. If models and statuses vary, use `responses` route attribute to add docs for different responses
 ```python
 from fastapi import APIRouter, status
 
@@ -400,7 +400,7 @@ router = APIRouter()
     response_model=DefaultResponseModel,  # default response pydantic model 
     status_code=status.HTTP_201_CREATED,  # default status code
     description="Description of the well documented endpoint",
-    tags=["Resource_1", "Resource_2"],
+    tags=["Endpoint Category"],
     summary="Summary of the Endpoint",
     responses={
         status.HTTP_200_OK: {
