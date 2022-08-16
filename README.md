@@ -58,7 +58,7 @@ fastapi-project
 1. Store all the module directories inside src folder
    1. `src/` - highest level of an app, contains common models, configs, and constants, etc.
    2. `src/main.py` - root of the project, which inits the FastAPI app
-2. Each module has its own router, schemas, models, etc.
+2. Each package has its own router, schemas, models, etc.
    1. `router.py` - is a core of each module with all the endpoints
    2. `schemas.py` - for pydantic models
    3. `models.py` - for db models
@@ -68,6 +68,12 @@ fastapi-project
    7. `config.py` - e.g. env vars
    8. `utils.py` - non-business logic functions, e.g. response normalization, data enrichment, etc.
    9. `exceptions` - module specific exceptions, e.g. `PostNotFound`, `InvalidUserData`
+3. When package requires services or dependencies or constants from other packages - import them with explicit module name
+```python
+from src.auth import constants as auth_constants
+from src.notifictions import service as notification_service
+from src.posts.constants import ErrorCode as PostsErrorCode  # standard ErrorCode class with constant literals
+```
 
 ### 2. Excessively use Pydantic
 Pydantic has a rich set of features to validate and transform data. 
@@ -89,7 +95,7 @@ class UserBase(BaseModel):
     username: constr(regex="^[A-Za-z0-9-_]+$", to_lower=True, strip_whitespace=True)
     email: EmailStr
     age: int = Field(ge=18, default=None)  # must be greater or equal to 18
-    favorite_band: MusicBand = None. # only "AEROSMITH", "QUEEN", "AC/DC" values are allowed to be inputted
+    favorite_band: MusicBand = None  # only "AEROSMITH", "QUEEN", "AC/DC" values are allowed to be inputted
     website: AnyUrl = None
 
 ```
@@ -172,12 +178,20 @@ async def get_user_post(post: Mapping = Depends(valid_owned_post)):
 
 ```
 ### 6. Decouple & Reuse dependencies. Dependency calls are cached.
-Depdencies can be reused multiple times and they won't be recalculated - FastAPI caches their result by default,
-i.e. if we have dependency which calls service `get_post_by_id`,
-we won't be visiting DB each time we call this dependency - only the first time.
-   1. If attr is better to be validated through several dependencies - do it, don't make monster dependencies
+Dependencies can be reused multiple times, and they won't be recalculated - FastAPI caches their result by default,
+e.g. if we have a dependency which calls service `get_post_by_id`, we won't be visiting DB each time we call this dependency - only the first function call.
+
+Knowing this, we can easily decouple dependencies onto multiple smaller functions that operate on a smaller scope and are easier to reuse in other routes.
+For example, in the code below we are using `parse_jwt_data` three times:
+1. `valid_owned_post`
+2. `valid_active_creator`
+3. `get_user_post`,
+
+but `parse_jwt_data` is called only once, in the very first call.
+
 ```python3
 # dependencies.py
+from fastapi import BackgroundTasks
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 
@@ -223,22 +237,132 @@ async def valid_active_creator(
 # router.py
 @router.get("/users/{user_id}/posts/{post_id}", response_model=PostResponse)
 async def get_user_post(
+    worker: BackgroundTasks,
     post: Mapping = Depends(valid_owned_post),
     user: Mapping = Depends(valid_active_creator),
 ):
     """Get post that belong the active user."""
-    
+    worker.add_task(notifications_service.send_email, user["id"])
     return post
 
 ```
 
 ### 7. Follow REST
-1. Developing RESTfull API makes it easier to reuse dependencies e.g. /users/:user_id, /users/:user_id/posts/:post_id
-2. Add /me endpoint for users own posts 
-   1. No need to validate that user id exists - it's already checked via auth
-   2. No need to check user id belongs to the requester
+1. Developing RESTfull API makes it easier to reuse dependencies
+Following REST leads us to reuse dependencies and  
+   1. `GET /courses/:course_id`
+   2. `GET /courses/:course_id/chapters/:chapter_id/lessons`
+   3. `GET /chapters/:chapter_id`
 
-### 8. DON'T MAKE YOUR ROUTE ASYNC IF YOU CONNECT TO DB OR MAKE EXTERNAL REQUESTS SYNC
+The only caveat is to use the same variable names in the path,
+i.e. if you have two endpoints `GET /profiles/:profile_id` and `GET /creators/:creator_id`
+that both validate whether the given profile exists, 
+but `GET /creators/:creator_id` also checks if the profile is creator, then it's better to chain those two dependencies.
+```python3
+# src.profiles.dependencies
+async def valid_profile_id(profile_id: UUID4) -> Mapping:
+    profile = await service.get_by_id(post_id)
+    if not profile:
+        raise ProfileNotFound()
+
+    return profile
+
+# src.creators.dependencies
+async def valid_creator_id(profile: Mapping = Depends(valid_profile_id)) -> Mapping:
+    if not profile["is_creator"]:
+       raise ProfileNotCreator()
+
+    return profile
+
+# src.profiles.router.py
+@router.get("/profiles/{user_id}", response_model=ProfileResponse)
+async def get_user_profile_by_id(profile: Mapping = Depends(valid_profile_id)):
+    """Get profile by id."""
+    return profile
+
+# src.creators.router.py
+@router.get("/profiles/{user_id}", response_model=ProfileResponse)
+async def get_user_profile_by_id(
+     creator_profile: Mapping = Depends(valid_creator_id)
+):
+    """Get profile by id."""
+    return creator_profile
+
+```
+
+2. Add /me endpoint for users own posts 
+   1. No need to validate that user id exists - it's already checked via auth method
+   2. No need to check whether the user id belongs to the requester
+
+### 8. Don't make your routes async, if you have only blocking I/O operations
+Under the hood, FastAPI can [effectively handle](https://fastapi.tiangolo.com/async/#path-operation-functions) both async and sync I/O operations. 
+- FastAPI calls sync routes in the [threadpool](https://en.wikipedia.org/wiki/Thread_pool) 
+and blocking I/O operations won't stop [event loop](https://docs.python.org/3/library/asyncio-eventloop.html) 
+from executing the tasks. 
+- Otherwise, if the route is defined as `async` then it's called regularly via `await` 
+and FastAPI trusts you to do only non-blocking I/O operations.
+
+The caveat is if you fail that trust and execute blocking operations within async routes, 
+event loop will not be able to run the next tasks until that blocking operation is done.
+```python
+import asyncio
+import time
+
+@router.get("/terrible-ping")
+async def terrible_catastrophic_ping():
+    time.sleep(10) # I/O blocking operation for 10 seconds
+    pong = service.get_pong()  # I/O blocking operation to get pong from DB
+    
+    return {"pong": pong}
+
+@router.get("/good-ping")
+def good_ping():
+    time.sleep(10) # I/O blocking operation for 10 seconds, but in another thread
+    pong = service.get_pong()  # I/O blocking operation to get pong from DB, but in another thread
+    
+    return {"pong": pong}
+
+@router.get("/perfect-ping")
+async def perfect_ping():
+    await asyncio.sleep(10) # not I/O blocking operation
+    pong = await service.async_get_pong()  # non I/O blocking db call
+
+    return {"pong": pong}
+
+```
+**What happens when we call:**
+1. `GET /terrible-ping`
+   1. FastAPI server receives a request and starts handling it 
+   2. Server's event loop and all the tasks in the queue will be waiting until `time.sleep()` is finished
+      1. Server thinks `time.sleep()` is not an I/O task, so it waits until it is finished
+      2. Server won't accept any new requests while waiting
+   3. Then, event loop and all the tasks in the queue will be waiting until `service.get_pong` is finished
+      1. Server thinks `service.get_pong()` is not an I/O task, so it waits until it is finished
+      2. Server won't accept any new requests while waiting
+   4. Server returns the response. 
+      1. After a response, server starts accepting new requests
+2. `GET /good-ping`
+   1. FastAPI server receives a request and starts handling it
+   2. FastAPI sends the whole route `good_ping` to the threadpool, where a worker thread will run the function
+   3. While `good_ping` is being executed, event loop selects next tasks from the queue and works on them (e.g. accept new request, call db)
+      - Independently of main thread (i.e. our FastAPI app), 
+        worker thread will be waiting for `time.sleep` to finish and then for `service.get_pong` to finish
+   4. When `good_ping` finishes its work, server returns a response to the client
+3. `GET /perfect-ping`
+   1. FastAPI server receives a request and starts handling it
+   2. FastAPI awaits `asyncio.sleep(10)`
+   3. Event loop selects next tasks from the queue and works on them (e.g. accept new request, call db)
+   4. When `asyncio.sleep(10)` is done, servers goes to the next lines and awaits `service.async_get_pong`
+   5. Event loop selects next tasks from the queue and works on them (e.g. accept new request, call db)
+   6. When `service.async_get_pong` is done, server returns a response to the client
+
+The caveat is that operations that are sent to thread pool or are non-blocking awaitables should be I/O intensive tasks (e.g. open file, db call, external API call).
+- Awaiting CPU intensive tasks (e.g. heavy calculations, data processing, video transcoding) is worthless, since CPU has to work to finish the tasks, 
+while I/O operations are external and server does nothing while waiting for that operations to finish, thus it can go to the next tasks.
+- Running CPU intensive tasks in other threads also isn't effective, because of [GIL](https://realpython.com/python-gil/). 
+In short, GIL allows only one thread to work at a time, which makes it useless for CPU tasks. 
+- If you want to optimize CPU intensive tasks you should send them to workers in another process.
+
 ### 9. Custom base model model from day 0, 
 convert datetime to common standard
 ### 10. Hide docs by default. Show it explicitly on the selected envs
