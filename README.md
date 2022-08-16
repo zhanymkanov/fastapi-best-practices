@@ -72,7 +72,7 @@ fastapi-project
 ```python
 from src.auth import constants as auth_constants
 from src.notifictions import service as notification_service
-from src.posts.constants import ErrorCode as PostsErrorCode  # standard ErrorCode class with constant literals
+from src.posts.constants import ErrorCode as PostsErrorCode  # in case we have Standard ErrorCode in constants module of each package
 ```
 
 ### 2. Excessively use Pydantic
@@ -248,16 +248,16 @@ async def get_user_post(
 ```
 
 ### 7. Follow REST
-1. Developing RESTfull API makes it easier to reuse dependencies
+Developing RESTfull API makes it easier to reuse dependencies
 Following REST leads us to reuse dependencies and  
    1. `GET /courses/:course_id`
    2. `GET /courses/:course_id/chapters/:chapter_id/lessons`
    3. `GET /chapters/:chapter_id`
 
 The only caveat is to use the same variable names in the path,
-i.e. if you have two endpoints `GET /profiles/:profile_id` and `GET /creators/:creator_id`
-that both validate whether the given profile exists, 
-but `GET /creators/:creator_id` also checks if the profile is creator, then it's better to chain those two dependencies.
+- If you have two endpoints `GET /profiles/:profile_id` and `GET /creators/:creator_id`
+that both validate whether the given profile_id exists,  but `GET /creators/:creator_id`
+also checks if the profile is creator, then it's better to rename `creator_id` path variable to `profile_id` and chain those two dependencies.
 ```python3
 # src.profiles.dependencies
 async def valid_profile_id(profile_id: UUID4) -> Mapping:
@@ -275,13 +275,13 @@ async def valid_creator_id(profile: Mapping = Depends(valid_profile_id)) -> Mapp
     return profile
 
 # src.profiles.router.py
-@router.get("/profiles/{user_id}", response_model=ProfileResponse)
+@router.get("/profiles/{profile_id}", response_model=ProfileResponse)
 async def get_user_profile_by_id(profile: Mapping = Depends(valid_profile_id)):
     """Get profile by id."""
     return profile
 
 # src.creators.router.py
-@router.get("/profiles/{user_id}", response_model=ProfileResponse)
+@router.get("/profiles/{profile_id}", response_model=ProfileResponse)
 async def get_user_profile_by_id(
      creator_profile: Mapping = Depends(valid_creator_id)
 ):
@@ -290,7 +290,7 @@ async def get_user_profile_by_id(
 
 ```
 
-2. Add /me endpoint for users own posts 
+Use /me endpoints for users own resources (e.g. `GET /profiles/me`, `GET /users/me/posts`)
    1. No need to validate that user id exists - it's already checked via auth method
    2. No need to check whether the user id belongs to the requester
 
@@ -324,7 +324,7 @@ def good_ping():
 
 @router.get("/perfect-ping")
 async def perfect_ping():
-    await asyncio.sleep(10) # not I/O blocking operation
+    await asyncio.sleep(10) # non I/O blocking operation
     pong = await service.async_get_pong()  # non I/O blocking db call
 
     return {"pong": pong}
@@ -356,7 +356,7 @@ async def perfect_ping():
    5. Event loop selects next tasks from the queue and works on them (e.g. accept new request, call db)
    6. When `service.async_get_pong` is done, server returns a response to the client
 
-The caveat is that operations that are sent to thread pool or are non-blocking awaitables should be I/O intensive tasks (e.g. open file, db call, external API call).
+The caveat is that operations that are non-blocking awaitables or sent to thread pool must be I/O intensive tasks (e.g. open file, db call, external API call).
 - Awaiting CPU intensive tasks (e.g. heavy calculations, data processing, video transcoding) is worthless, since CPU has to work to finish the tasks, 
 while I/O operations are external and server does nothing while waiting for that operations to finish, thus it can go to the next tasks.
 - Running CPU intensive tasks in other threads also isn't effective, because of [GIL](https://realpython.com/python-gil/). 
