@@ -363,6 +363,12 @@ while I/O operations are external and server does nothing while waiting for that
 In short, GIL allows only one thread to work at a time, which makes it useless for CPU tasks. 
 - If you want to optimize CPU intensive tasks you should send them to workers in another process.
 
+**Related StackOverflow questions of confused users**
+1. https://stackoverflow.com/questions/62976648/architecture-flask-vs-fastapi/70309597#70309597
+   - Here you can also check [my answer](https://stackoverflow.com/a/70309597/6927498)
+2. https://stackoverflow.com/questions/65342833/fastapi-uploadfile-is-slow-compared-to-flask
+3. https://stackoverflow.com/questions/71516140/fastapi-runs-api-calls-in-serial-instead-of-parallel-fashion
+
 ### 9. Custom base model model from day 0, 
 convert datetime to common standard
 ### 10. Hide docs by default. Show it explicitly on the selected envs
