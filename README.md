@@ -75,7 +75,7 @@ from src.notifictions import service as notification_service
 from src.posts.constants import ErrorCode as PostsErrorCode  # in case we have Standard ErrorCode in constants module of each package
 ```
 
-### 2. Excessively use Pydantic
+### 2. Excessively use Pydantic for data validation
 Pydantic has a rich set of features to validate and transform data. 
 
 In addition to regular features like required, non-required fields and default data, 
@@ -472,29 +472,217 @@ async def documented_route():
 Will generate docs like this:
 ![FastAPI Generated Custom Response Docs](images/custom_responses.png "Custom Response Docs")
 
-### 11. Use Starlette's Config object, instead of 3rd party ones - it's decent enough
-### 12. Set DB keys naming convention immediately, from day 0
-### 13. Set DB table naming convention immediately, from day 0
-### 14. Set uuids within the app
-it's easier to test
+### 11. Use Starlette's Config object
+It's decent enough not to use 3rd party ones.
+```python
+from starlette.config import Config
+
+config = Config(".env")
+
+DATABASE_URL = config("DATABASE_URL")
+IS_GOOD_ENV = config("IS_GOOD_ENV", cast=bool, default=True)
+ALLOWED_CORS_ORIGINS = config(
+    "CORS_ORIGINS",
+    cast=lambda x: x.split(","),
+    default="https://mysite.com,https://mysite.org",
+)
+```
+### 12. SQLAlchemy: Set DB keys naming convention from day 0
+```python
+from sqlalchemy import MetaData
+
+POSTGRES_INDEXES_NAMING_CONVENTION = {
+    "ix": "%(column_0_label)s_idx",
+    "uq": "%(table_name)s_%(column_0_name)s_key",
+    "ck": "%(table_name)s_%(constraint_name)s_check",
+    "fk": "%(table_name)s_%(column_0_name)s_fkey",
+    "pk": "%(table_name)s_pkey",
+}
+metadata = MetaData(naming_convention=POSTGRES_INDEXES_NAMING_CONVENTION)
+```
+### 13. Set DB table naming convention immediately from day 0
+### 14. Set UUIDs within the app
+Setting them in database makes it harder to write integration tests.
 ### 15. Set tests client async from day 0
-1. Unless you aren't planning to add integrational tests with db
-2. If you do, then do it. Problems with event loop will appear once you want to prepare objects
+Writing integration tests with DB will most likely lead to messed up event loop errors in the future.
+Set the async test client immediately, e.g. [asyn_asgi_testclient](https://github.com/vinissimus/async-asgi-testclient) or [httpx](https://github.com/encode/starlette/issues/652)
+```python
+import pytest
+from async_asgi_testclient import TestClient
+
+from src.main import app  # initted FastAPI app
+
+
+@pytest.fixture
+async def client():
+    host, port = "127.0.0.1", "5555"
+    scope = {"client": (host, port)}
+
+    async with TestClient(
+        app, scope=scope, headers={"X-User-Fingerprint": "Test"}
+    ) as client:
+        yield client
+```
+Unless you have sync db connection (excuse me?) or aren't planning to write integration tests.
 ### 16. Set postgres identity from day 0
-### 17. take use of background workers - they are stable enough
-good for both async and sync routes
-### 18. take use of response model, response status, responses
-### 19. typing is important - use it everywhere
-### 20. save files in chunk
-### 21. use smart union or add explicit invalidation
-### 22. do a lot of logic in db, use pydantic to parse it (show the way we evolved creator field)
-### 23. validate file formats
-### 24. validate url source (if users are able to send files)
-### 25. root_validator if multiple columns
+### 17. Use BackgroundTasks
+They are stable enough for async (delayed) tasks
+```python
+from fastapi import BackgroundTasks
+
+
+# router.py
+@router.get("/users/{user_id}/posts/{post_id}")
+async def get_user_post(
+    worker: BackgroundTasks,
+):
+    """Get post that belong the active user."""
+    worker.add_task(notifications_service.send_email, user["id"])
+    return {"status": "ok"}
+```
+### 19. Typing is important
+FastAPI, Pydantic, and modern IDEs encourage to take use of type hints.
+
+**Without Type Hints**
+
+<img src="images/type_hintsless.png" width="400" height="auto">
+
+**With Type Hints**
+
+<img src="images/type_hints.png" width="400" height="auto">
+
+### 20. Don't hope your clients will send small BLOBs. Save files in chunk.
+```python
+import aiofiles
+from fastapi import UploadFile
+
+DEFAULT_CHUNK_SIZE = 1024 * 1024 * 50  # 50 megabytes
+
+async def save_video(video_file: UploadFile):
+   async with aiofiles.open("/file/path/name.mp4", "wb") as f:
+     while chunk := await video_file.read(DEFAULT_CHUNK_SIZE):
+         await f.write(chunk)
+```
+### 21. Be careful with dynamic pydantic fields
+If you have a pydantic field that can accept multiple types, be sure validator explicitly knows the difference between those types.
+```python
+from pydantic import BaseModel
+
+
+class Article(BaseModel):
+   text: str | None
+   extra: str | None
+
+
+class Video(BaseModel):
+   video_id: int
+   text: str | None
+   extra: str | None
+
+
+   
+class Post(BaseModel):
+   content: Article | Video
+
+   
+post = Post(content={"video_id": 1, "text": "text"})
+print(type(post.content))
+# OUTPUT: Article
+# Because Article is very inclusive and all fields are optional
+```
+**Solutions:**
+1. Not so bad solution. Order field types properly: from the most strict ones to loose ones.
+```python
+class Post(BaseModel):
+   content: Video | Article
+```
+2. Not so bad solution. Validate input has only valid fields 
+```python
+from pydantic import BaseModel, root_validator
+
+class Article(BaseModel):
+   text: str | None
+   extra: str | None
+   
+   @root_validator(pre=True)  # validate all values before pydantic
+   def has_only_article_fields(cls, data: dict):
+      """Silly and ugly solution to validate data has only article fields."""
+      fields = set(data.keys())
+      if fields != {"text", "extra"}:
+         raise ValueError("invalid fields")
+
+      return data
+       
+
+class Video(BaseModel):
+   video_id: int
+   text: str | None
+   extra: str | None
+   
+   @root_validator(pre=True)
+   def has_only_video_fields(cls, data: dict):
+      """Silly and ugly solution to validate data has only article fields."""
+      fields = set(data.keys())
+      if fields != {"text", "extra", "video_id"}:
+         raise ValueError("invalid fields")
+
+      return data
+
+   
+class Post(BaseModel):
+   content: Article | Video
+```
+3. Good solution. Use Pydantic's Smart Union (>v1.9)
+```python
+from pydantic import BaseModel
+
+class Post(BaseModel):
+   content: Article | Video
+
+   class Config:
+      smart_union = True
+```
+### 22. SQL-first, Pydantic-second
+### 23. Validate file formats
+### 24. Validate url source (if users are able to send files)
+```python
+from pydantic import AnyUrl
+
+ALLOWED_MEDIA_URLS = {"mysite.com", "mysite.org"}
+
+class CompanyMediaUrl(AnyUrl):
+    @classmethod
+    def validate_host(cls, parts: dict) -> tuple[str, str | None, str, bool]:
+        host, tld, host_type, rebuild = super().validate_host(parts)
+        if host not in ALLOWED_MEDIA_URLS:
+            raise ValueError(
+                "Forbidden host url. Upload files only to internal services."
+            )
+
+        return host, tld, host_type, rebuild
+```
+### 25. root_validator to use multiple columns during validation
+```python
+from pydantic import BaseModel, root_validator
+
+
+class Profile(BaseModel):
+    username: str | None
+    first_name: str
+    last_name: str
+
+    @root_validator()
+    def set_username(cls, data: dict) -> dict:
+        if not data.get("username"):
+            data["username"] = f'{data["first_name"]}_{data["last_name"]}'
+        
+        return data
+```
 ### 26. pre if data need to be pre-handled before validation
-### 27. you can just raise a ValueError in pydantic schemas, if that's it faces user request. 
+### 27. you can just raise a ValueError in pydantic schemas, if schemas faces http client 
 it will return a nice response
 ### 28. don't forget that fastapi converts response Model to Dict then to Model then to JSON
+it may lead to bugs like model can parse only raw data (e.g. forced data aggregation for raw data)
 ### 29. if no async lib, and poor documentation, then use starlette's run_in_threadpool or asgiref
 ### 30. use linters (black, isort, autoflake)
 ### 31. set logs from day 0
