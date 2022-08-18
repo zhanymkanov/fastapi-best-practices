@@ -1,5 +1,5 @@
 ## WIP: FastAPI Best Practices
-Opinionated list of best practices and conventions we have developed after 1.5 years in production. 
+Opinionated list of best practices and conventions we have used after 1.5 years in production. 
 ### 1. Project Structure. Group files by module domain, not file types.
 I didn't like the project structure presented by @tiangolo, 
 where we separate files by their type (e.g. api, crud, models, schemas).
@@ -483,7 +483,7 @@ DATABASE_URL = config("DATABASE_URL")
 IS_GOOD_ENV = config("IS_GOOD_ENV", cast=bool, default=True)
 ALLOWED_CORS_ORIGINS = config(
     "CORS_ORIGINS",
-    cast=lambda x: x.split(","),
+    cast=lambda x: x.split(","),  # if no env, it first sets default value, only then it casts it with this lambda
     default="https://mysite.com,https://mysite.org",
 )
 ```
@@ -510,7 +510,7 @@ Set the async test client immediately, e.g. [asyn_asgi_testclient](https://githu
 import pytest
 from async_asgi_testclient import TestClient
 
-from src.main import app  # initted FastAPI app
+from src.main import app  # inited FastAPI app
 
 
 @pytest.fixture
