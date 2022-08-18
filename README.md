@@ -522,6 +522,13 @@ async def client():
         app, scope=scope, headers={"X-User-Fingerprint": "Test"}
     ) as client:
         yield client
+
+
+@pytest.mark.asyncio
+async def test_create_post(client: TestClient):
+    resp = await client.post("/posts")
+
+    assert resp.status_code == 201
 ```
 Unless you have sync db connection (excuse me?) or aren't planning to write integration tests.
 ### 16. Set postgres identity from day 0
