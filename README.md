@@ -587,7 +587,6 @@ class Video(BaseModel):
    text: str | None
    extra: str | None
 
-
    
 class Post(BaseModel):
    content: Article | Video
@@ -596,7 +595,7 @@ class Post(BaseModel):
 post = Post(content={"video_id": 1, "text": "text"})
 print(type(post.content))
 # OUTPUT: Article
-# Because Article is very inclusive and all fields are optional
+# Article is very inclusive and all fields are optional, allowing any dict to become valid
 ```
 **Solutions:**
 1. Not so bad solution. Order field types properly: from the most strict ones to loose ones.
@@ -652,7 +651,8 @@ class Post(BaseModel):
 ```
 ### 22. SQL-first, Pydantic-second
 ### 23. Validate file formats
-### 24. Validate url source (if users are able to send files)
+### 24. Validate url source (if users are able to upload files)
+Bad users could send strange urls for user facing public objects.
 ```python
 from pydantic import AnyUrl
 
