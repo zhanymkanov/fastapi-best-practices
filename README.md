@@ -536,15 +536,16 @@ Unless you have sync db connection (excuse me?) or aren't planning to write inte
 They are stable enough for async (delayed) tasks
 ```python
 from fastapi import BackgroundTasks
+from pydantic import UUID4
+
+from src.notifications import service as notifications_service
 
 
 # router.py
-@router.get("/users/{user_id}/posts/{post_id}")
-async def get_user_post(
-    worker: BackgroundTasks,
-):
-    """Get post that belong the active user."""
-    worker.add_task(notifications_service.send_email, user["id"])
+@router.post("/users/{user_id}/email")
+async def send_user_email(worker: BackgroundTasks, user_id: UUID4):
+    """Send email to user"""
+    worker.add_task(notifications_service.send_email, user_id)  # send email after responding client
     return {"status": "ok"}
 ```
 ### 19. Typing is important
