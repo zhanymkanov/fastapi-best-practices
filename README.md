@@ -688,7 +688,7 @@ class Post(BaseModel):
 ### 22. Validate url source (if users are able to upload files)
 Bad users could send strange urls for user facing public objects.
 ```python
-from pydantic import AnyUrl
+from pydantic import AnyUrl, BaseModel
 
 ALLOWED_MEDIA_URLS = {"mysite.com", "mysite.org"}
 
@@ -702,6 +702,11 @@ class CompanyMediaUrl(AnyUrl):
             )
 
         return host, tld, host_type, rebuild
+
+
+class Post(BaseModel):
+    thumbnail_url: CompanyMediaUrl
+
 ```
 ### 23. root_validator to use multiple columns during validation
 ```python
