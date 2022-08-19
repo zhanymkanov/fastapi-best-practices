@@ -1,5 +1,39 @@
 ## WIP: FastAPI Best Practices
-Opinionated list of best practices and conventions we have used after 1.5 years in production. 
+Opinionated list of best practices and conventions we used at our startup.
+
+For the last 1.5 years in production,
+we have been making good and bad decisions that impacted our developer experience dramatically.
+Some of them are worth sharing.
+
+### Contents
+1. Project Structure. Group files by module domain, not file types.
+2. Excessively use Pydantic for data validation
+3. Use dependencies for data validation vs DB
+4. Chain dependencies
+5. Decouple & Reuse dependencies. Dependency calls are cached.
+6. Follow the REST
+7. Don't make your routes async, if you have only blocking I/O operations
+8. Custom base model from day 0
+9. Docs
+10. Use Starlette's Config object
+11. SQLAlchemy: Set DB keys naming convention from day 0
+12. Set DB table naming convention immediately from day 0
+13. ~~Set UUIDs within the app~~
+14. Set tests client async from day 0
+15. ~~Set postgres identity from day 0~~
+16. Use BackgroundTasks
+17. Typing is important
+18. Don't hope your clients will send small BLOBs. Save files in chunk
+19. Be careful with dynamic pydantic fields
+20. ~~SQL-first, Pydantic-second~~ 
+21. ~~Validate file formats~~
+22. Validate url source (if users are able to upload files)
+23. root_validator to use multiple columns during validation
+24. ~~pre=True if data need to be pre-handled before validation~~
+25. raise a ValueError in pydantic, if schema faces http client
+26. ~~remember fastapi response modeling~~
+27. if must use sdk, but it's not async, use threadpools
+
 ### 1. Project Structure. Group files by module domain, not file types.
 I didn't like the project structure presented by @tiangolo, 
 where we separate files by their type (e.g. api, crud, models, schemas).
@@ -135,7 +169,7 @@ async def get_post_reviews(post: Mapping = Depends(valid_post_id)):
 If we didn't put data validation to dependency, we would have to add post_id validation
 for every endpoint and write the same tests for each of them. 
 
-### 5. Chain dependencies
+### 4. Chain dependencies
 Dependencies can use other dependencies and avoid code repetition for similar logic.
 ```python3
 # dependencies.py
@@ -177,7 +211,7 @@ async def get_user_post(post: Mapping = Depends(valid_owned_post)):
     return post
 
 ```
-### 6. Decouple & Reuse dependencies. Dependency calls are cached.
+### 5. Decouple & Reuse dependencies. Dependency calls are cached.
 Dependencies can be reused multiple times, and they won't be recalculated - FastAPI caches their result by default,
 e.g. if we have a dependency which calls service `get_post_by_id`, we won't be visiting DB each time we call this dependency - only the first function call.
 
@@ -247,7 +281,7 @@ async def get_user_post(
 
 ```
 
-### 7. Follow the REST
+### 6. Follow the REST
 Developing RESTful API makes it easier to reuse dependencies in routes like these:
    1. `GET /courses/:course_id`
    2. `GET /courses/:course_id/chapters/:chapter_id/lessons`
@@ -293,7 +327,7 @@ Use /me endpoints for users own resources (e.g. `GET /profiles/me`, `GET /users/
    1. No need to validate that user id exists - it's already checked via auth method
    2. No need to check whether the user id belongs to the requester
 
-### 8. Don't make your routes async, if you have only blocking I/O operations
+### 7. Don't make your routes async, if you have only blocking I/O operations
 Under the hood, FastAPI can [effectively handle](https://fastapi.tiangolo.com/async/#path-operation-functions) both async and sync I/O operations. 
 - FastAPI calls sync routes in the [threadpool](https://en.wikipedia.org/wiki/Thread_pool) 
 and blocking I/O operations won't stop [event loop](https://docs.python.org/3/library/asyncio-eventloop.html) 
@@ -368,7 +402,7 @@ In short, GIL allows only one thread to work at a time, which makes it useless f
 2. https://stackoverflow.com/questions/65342833/fastapi-uploadfile-is-slow-compared-to-flask
 3. https://stackoverflow.com/questions/71516140/fastapi-runs-api-calls-in-serial-instead-of-parallel-fashion
 
-### 9. Custom base model from day 0.
+### 8. Custom base model from day 0.
 Having a controllable global pydantic base model allows us to customize all the models within the app.
 For example, we could have a standard datetime format or add a super method for all subclasses of the base model.
 ```python
@@ -419,8 +453,8 @@ In the example above we have decided to make a global base model which:
 - uses [orjson](https://github.com/ijl/orjson) to serialize data
 - drops microseconds to 0 in all date formats
 - serializes all datetime fields to standard format with explicit timezone 
-### 10. Docs
-1. Unless your API is public, hide docs by default. Show it explicitly on the selected envs only.
+### 9. Docs
+1. Unless your API is private, hide docs by default. Show it explicitly on the selected envs only.
 ```python
 from fastapi import FastAPI
 from starlette.config import Config
@@ -472,7 +506,7 @@ async def documented_route():
 Will generate docs like this:
 ![FastAPI Generated Custom Response Docs](images/custom_responses.png "Custom Response Docs")
 
-### 11. Use Starlette's Config object
+### 10. Use Starlette's Config object
 It's decent enough not to use 3rd party ones.
 ```python
 from starlette.config import Config
@@ -487,7 +521,7 @@ ALLOWED_CORS_ORIGINS = config(
     default="https://mysite.com,https://mysite.org",
 )
 ```
-### 12. SQLAlchemy: Set DB keys naming convention from day 0
+### 11. SQLAlchemy: Set DB keys naming convention from day 0
 ```python
 from sqlalchemy import MetaData
 
@@ -500,10 +534,10 @@ POSTGRES_INDEXES_NAMING_CONVENTION = {
 }
 metadata = MetaData(naming_convention=POSTGRES_INDEXES_NAMING_CONVENTION)
 ```
-### 13. Set DB table naming convention immediately from day 0
-### 14. Set UUIDs within the app
+### 12. Set DB table naming convention immediately from day 0
+### 13. Set UUIDs within the app
 Setting them in database makes it harder to write integration tests.
-### 15. Set tests client async from day 0
+### 14. Set tests client async from day 0
 Writing integration tests with DB will most likely lead to messed up event loop errors in the future.
 Set the async test client immediately, e.g. [asyn_asgi_testclient](https://github.com/vinissimus/async-asgi-testclient) or [httpx](https://github.com/encode/starlette/issues/652)
 ```python
@@ -531,8 +565,8 @@ async def test_create_post(client: TestClient):
     assert resp.status_code == 201
 ```
 Unless you have sync db connection (excuse me?) or aren't planning to write integration tests.
-### 16. Set postgres identity from day 0
-### 17. Use BackgroundTasks
+### 15. Set postgres identity from day 0
+### 16. Use BackgroundTasks
 They are stable enough for async (delayed) tasks
 ```python
 from fastapi import BackgroundTasks
@@ -548,7 +582,7 @@ async def send_user_email(worker: BackgroundTasks, user_id: UUID4):
     worker.add_task(notifications_service.send_email, user_id)  # send email after responding client
     return {"status": "ok"}
 ```
-### 19. Typing is important
+### 17. Typing is important
 FastAPI, Pydantic, and modern IDEs encourage to take use of type hints.
 
 **Without Type Hints**
@@ -559,7 +593,7 @@ FastAPI, Pydantic, and modern IDEs encourage to take use of type hints.
 
 <img src="images/type_hints.png" width="400" height="auto">
 
-### 20. Don't hope your clients will send small BLOBs. Save files in chunk.
+### 18. Don't hope your clients will send small BLOBs. Save files in chunk.
 ```python
 import aiofiles
 from fastapi import UploadFile
@@ -571,7 +605,7 @@ async def save_video(video_file: UploadFile):
      while chunk := await video_file.read(DEFAULT_CHUNK_SIZE):
          await f.write(chunk)
 ```
-### 21. Be careful with dynamic pydantic fields
+### 19. Be careful with dynamic pydantic fields
 If you have a pydantic field that can accept multiple types, be sure validator explicitly knows the difference between those types.
 ```python
 from pydantic import BaseModel
@@ -649,9 +683,9 @@ class Post(BaseModel):
    class Config:
       smart_union = True
 ```
-### 22. SQL-first, Pydantic-second
-### 23. Validate file formats
-### 24. Validate url source (if users are able to upload files)
+### 20. SQL-first, Pydantic-second
+### 21. Validate file formats
+### 22. Validate url source (if users are able to upload files)
 Bad users could send strange urls for user facing public objects.
 ```python
 from pydantic import AnyUrl
@@ -669,7 +703,7 @@ class CompanyMediaUrl(AnyUrl):
 
         return host, tld, host_type, rebuild
 ```
-### 25. root_validator to use multiple columns during validation
+### 23. root_validator to use multiple columns during validation
 ```python
 from pydantic import BaseModel, root_validator
 
@@ -686,11 +720,11 @@ class Profile(BaseModel):
         
         return data
 ```
-### 26. pre if data need to be pre-handled before validation
-### 27. you can just raise a ValueError in pydantic schemas, if schemas faces http client 
-it will return a nice response
-### 28. don't forget that fastapi converts response Model to Dict then to Model then to JSON
+### 24. pre if data need to be pre-handled before validation
+### 25. you can just raise a ValueError in pydantic schemas, if schemas faces http client 
+it wil return a nice response
+### 26. don't forget that fastapi converts response Model to Dict then to Model then to JSON
 it may lead to bugs like model can parse only raw data (e.g. forced data aggregation for raw data)
-### 29. if no async lib, and poor documentation, then use starlette's run_in_threadpool or asgiref
-### 30. use linters (black, isort, autoflake)
-### 31. set logs from day 0
+### 27. if no async lib, and poor documentation, then use starlette's run_in_threadpool or asgiref
+### 28. use linters (black, isort, autoflake)
+### 29. set logs from day 0
