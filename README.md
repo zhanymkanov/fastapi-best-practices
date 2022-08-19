@@ -6,31 +6,31 @@ we have been making good and bad decisions that impacted our developer experienc
 Some of them are worth sharing.
 
 ### Contents
-1. Project Structure. Group files by module domain, not file types.
-2. Excessively use Pydantic for data validation
-3. Use dependencies for data validation vs DB
-4. Chain dependencies
-5. Decouple & Reuse dependencies. Dependency calls are cached.
-6. Follow the REST
-7. Don't make your routes async, if you have only blocking I/O operations
-8. Custom base model from day 0
-9. Docs
-10. Use Starlette's Config object
-11. SQLAlchemy: Set DB keys naming convention from day 0
-12. Set DB table naming convention immediately from day 0
+1. [Project Structure. Group files by module domain, not file types.](https://github.com/zhanymkanov/fastapi-best-practices#1-project-structure-group-files-by-module-domain-not-file-types)
+2. [Excessively use Pydantic for data validation](https://github.com/zhanymkanov/fastapi-best-practices#2-excessively-use-pydantic-for-data-validation)
+3. [Use dependencies for data validation vs DB](https://github.com/zhanymkanov/fastapi-best-practices#3-use-dependencies-for-data-validation-vs-db)
+4. [Chain dependencies](https://github.com/zhanymkanov/fastapi-best-practices#4-chain-dependencies)
+5. [Decouple & Reuse dependencies. Dependency calls are cached.](https://github.com/zhanymkanov/fastapi-best-practices#5-decouple--reuse-dependencies-dependency-calls-are-cached)
+6. [Follow the REST](https://github.com/zhanymkanov/fastapi-best-practices#6-follow-the-rest)
+7. [Don't make your routes async, if you have only blocking I/O operations](https://github.com/zhanymkanov/fastapi-best-practices#7-dont-make-your-routes-async-if-you-have-only-blocking-io-operations)
+8. [Custom base model from day 0](https://github.com/zhanymkanov/fastapi-best-practices#8-custom-base-model-from-day-0)
+9. [Docs](https://github.com/zhanymkanov/fastapi-best-practices#9-docs)
+10. [Use Starlette's Config object](https://github.com/zhanymkanov/fastapi-best-practices#10-use-starlettes-config-object)
+11. [SQLAlchemy: Set DB keys naming convention from day 0](https://github.com/zhanymkanov/fastapi-best-practices#11-sqlalchemy-set-db-keys-naming-convention-from-day-0)
+12. [Set DB table naming convention immediately from day 0](https://github.com/zhanymkanov/fastapi-best-practices#12-set-db-table-naming-convention-immediately-from-day-0)
 13. ~~Set UUIDs within the app~~
-14. Set tests client async from day 0
+14. [Set tests client async from day 0](https://github.com/zhanymkanov/fastapi-best-practices#14-set-tests-client-async-from-day-0)
 15. ~~Set postgres identity from day 0~~
-16. Use BackgroundTasks
-17. Typing is important
-18. Don't hope your clients will send small BLOBs. Save files in chunk
-19. Be careful with dynamic pydantic fields
+16. [Use BackgroundTasks](https://github.com/zhanymkanov/fastapi-best-practices#16-use-backgroundtasks)
+17. [Typing is important](https://github.com/zhanymkanov/fastapi-best-practices#17-typing-is-important)
+18. [Don't hope your clients will send small BLOBs. Save files in chunk](https://github.com/zhanymkanov/fastapi-best-practices#18-dont-hope-your-clients-will-send-small-blobs-save-files-in-chunk)
+19. [Be careful with dynamic pydantic fields](https://github.com/zhanymkanov/fastapi-best-practices#19-be-careful-with-dynamic-pydantic-fields)
 20. ~~SQL-first, Pydantic-second~~ 
 21. ~~Validate file formats~~
-22. Validate url source (if users are able to upload files)
-23. root_validator to use multiple columns during validation
+22. [Validate url source (if users are able to upload files)](https://github.com/zhanymkanov/fastapi-best-practices#22-validate-url-source-if-users-are-able-to-upload-files)
+23. [root_validator to use multiple columns during validation](https://github.com/zhanymkanov/fastapi-best-practices#23-root_validator-to-use-multiple-columns-during-validation)
 24. ~~pre=True if data need to be pre-handled before validation~~
-25. raise a ValueError in pydantic, if schema faces http client
+25. ~~raise a ValueError in pydantic, if schema faces http client~~
 26. ~~remember fastapi response modeling~~
 27. if must use sdk, but it's not async, use threadpools
 
@@ -725,6 +725,6 @@ class Profile(BaseModel):
 it wil return a nice response
 ### 26. don't forget that fastapi converts response Model to Dict then to Model then to JSON
 it may lead to bugs like model can parse only raw data (e.g. forced data aggregation for raw data)
-### 27. if no async lib, and poor documentation, then use starlette's run_in_threadpool or asgiref
+### 27. if must use sdk, but it's not async, use threadpools
 ### 28. use linters (black, isort, autoflake)
 ### 29. set logs from day 0
