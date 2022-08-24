@@ -638,13 +638,13 @@ print(type(post.content))
 # OUTPUT: Article
 # Article is very inclusive and all fields are optional, allowing any dict to become valid
 ```
-**Solutions:**
-1. Not so bad solution. Order field types properly: from the most strict ones to loose ones.
+**Not Terrible Solutions:**
+1. Order field types properly: from the most strict ones to loose ones.
 ```python
 class Post(BaseModel):
    content: Video | Article
 ```
-2. Not so bad solution. Validate input has only valid fields 
+2. Validate input has only valid fields 
 ```python
 from pydantic import BaseModel, root_validator
 
@@ -680,15 +680,44 @@ class Video(BaseModel):
 class Post(BaseModel):
    content: Article | Video
 ```
-3. Good solution. Use Pydantic's Smart Union (>v1.9)
+3. Use Pydantic's Smart Union (>v1.9) if fields are simple
+It's a good solution if the fields are simple like `int` or `bool`, 
+but it doesn't work for complex fields like classes.
+
 ```python
 from pydantic import BaseModel
 
+
 class Post(BaseModel):
+   field_1: bool | int
+   field_2: int | str
+   content: Article | Video
+
+p = Post(field_1=1, field_2="1", content={"video_id": 1})
+print(p.field_1)
+# OUTPUT: True
+print(type(p.field_2))
+# OUTPUT: int
+print(type(p.content))
+# OUTPUT: Article
+
+
+class Post(BaseModel):
+   field_1: bool | int
+   field_2: int | str
    content: Article | Video
 
    class Config:
       smart_union = True
+
+
+p = Post(field_1=1, field_2="1", content={"video_id": 1})
+print(p.field_1)
+# OUTPUT: 1
+print(type(p.field_2))
+# OUTPUT: str
+print(type(p.content))
+# OUTPUT: Article
 ```
 ### 20. SQL-first, Pydantic-second
 ### 21. Validate file formats
