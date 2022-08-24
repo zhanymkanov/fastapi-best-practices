@@ -514,7 +514,7 @@ Will generate docs like this:
 ![FastAPI Generated Custom Response Docs](images/custom_responses.png "Custom Response Docs")
 
 ### 10. Use Pydantic's BaseSettings for configs
-They're decent enough.
+Pydantic gives a [powerful tool](https://pydantic-docs.helpmanual.io/usage/settings/) to parse environment variables and process them with its validators. 
 ```python
 from pydantic import AnyUrl, BaseSettings, PostgresDsn
 
