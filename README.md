@@ -15,7 +15,7 @@ Some of them are worth sharing.
 7. [Don't make your routes async, if you have only blocking I/O operations](https://github.com/zhanymkanov/fastapi-best-practices#7-dont-make-your-routes-async-if-you-have-only-blocking-io-operations)
 8. [Custom base model from day 0](https://github.com/zhanymkanov/fastapi-best-practices#8-custom-base-model-from-day-0)
 9. [Docs](https://github.com/zhanymkanov/fastapi-best-practices#9-docs)
-10. [Use Starlette's Config object](https://github.com/zhanymkanov/fastapi-best-practices#10-use-starlettes-config-object)
+10. [Use Pydantic's BaseSettings for configs](https://github.com/zhanymkanov/fastapi-best-practices#10-use-pydantics-basesettings-for-configs)
 11. [SQLAlchemy: Set DB keys naming convention from day 0](https://github.com/zhanymkanov/fastapi-best-practices#11-sqlalchemy-set-db-keys-naming-convention-from-day-0)
 12. [Set DB table naming convention immediately from day 0](https://github.com/zhanymkanov/fastapi-best-practices#12-set-db-table-naming-convention-immediately-from-day-0)
 13. ~~Set UUIDs within the app~~
@@ -513,20 +513,20 @@ async def documented_route():
 Will generate docs like this:
 ![FastAPI Generated Custom Response Docs](images/custom_responses.png "Custom Response Docs")
 
-### 10. Use Starlette's Config object
-It's decent enough not to use 3rd party ones.
+### 10. Use Pydantic's BaseSettings for configs
+They're decent enough.
 ```python
-from starlette.config import Config
+from pydantic import AnyUrl, BaseSettings, PostgresDsn
 
-config = Config(".env")
+class AppSettings(BaseSettings):
+    class Config:
+        env_file = ".env"
+        env_file_encoding = "utf-8"
+        env_prefix = "app_"
 
-DATABASE_URL = config("DATABASE_URL")
-IS_GOOD_ENV = config("IS_GOOD_ENV", cast=bool, default=True)
-ALLOWED_CORS_ORIGINS = config(
-    "CORS_ORIGINS",
-    cast=lambda x: x.split(","),  # if no env, it first sets default value, only then it casts it with this lambda
-    default="https://mysite.com,https://mysite.org",
-)
+    DATABASE_URL: PostgresDsn
+    IS_GOOD_ENV: bool = True
+    ALLOWED_CORS_ORIGINS: set[AnyUrl]
 ```
 ### 11. SQLAlchemy: Set DB keys naming convention from day 0
 ```python
