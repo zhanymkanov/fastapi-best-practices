@@ -6,7 +6,7 @@ we have been making good and bad decisions that impacted our developer experienc
 Some of them are worth sharing.
 
 ### Contents
-1. [Project Structure. Group files by module domain, not file types.](https://github.com/zhanymkanov/fastapi-best-practices#1-project-structure-group-files-by-module-domain-not-file-types)
+1. [Project Structure. Consistent & predictable](https://github.com/zhanymkanov/fastapi-best-practices#1-project-structure-consistent--predictable)
 2. [Excessively use Pydantic for data validation](https://github.com/zhanymkanov/fastapi-best-practices#2-excessively-use-pydantic-for-data-validation)
 3. [Use dependencies for data validation vs DB](https://github.com/zhanymkanov/fastapi-best-practices#3-use-dependencies-for-data-validation-vs-db)
 4. [Chain dependencies](https://github.com/zhanymkanov/fastapi-best-practices#4-chain-dependencies)
@@ -34,10 +34,17 @@ Some of them are worth sharing.
 26. ~~remember fastapi response modeling~~
 27. if must use sdk, but it's not async, use threadpools
 
-### 1. Project Structure. Group files by module domain, not file types.
-I didn't like the project structure presented by @tiangolo, 
-where we separate files by their type (e.g. api, crud, models, schemas).
-Structure that I find more scalable and evolvable is inspired by Netflix's [Dispatch](https://github.com/Netflix/dispatch) with some little modifications.
+### 1. Project Structure. Consistent & predictable
+There are many ways to structure the project, but the best structure is a structure that is consistent, straightforward and has no surprises.
+- If looking at the project structure doesn't give you an idea of what the project is about, then the structure might be unclear. 
+- If you have to open packages to understand what modules are located in it, then your structure is unclear.
+- If looking at the module's location and its name doesn't give you an idea of what's inside it, then your structure is bad.
+- If the frequency and location of the files feels random, then your project structure is bad. 
+
+Although, the project structure, where we separate files by their type (e.g. api, crud, models, schemas)
+presented by [@tiangolo](https://github.com/tiangolo) is perfect for microservices or projects with fewer scopes, 
+we couldn't fit it into our monolith with a lot of domains and modules. 
+Structure that I found more scalable and evolvable is inspired by Netflix's [Dispatch](https://github.com/Netflix/dispatch) with some little modifications.
 ```
 fastapi-project
 ├── alembic/
@@ -454,7 +461,7 @@ In the example above we have decided to make a global base model which:
 - drops microseconds to 0 in all date formats
 - serializes all datetime fields to standard format with explicit timezone 
 ### 9. Docs
-1. Unless your API is private, hide docs by default. Show it explicitly on the selected envs only.
+1. Unless your API is public, hide docs by default. Show it explicitly on the selected envs only.
 ```python
 from fastapi import FastAPI
 from starlette.config import Config
