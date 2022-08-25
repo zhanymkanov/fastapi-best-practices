@@ -6,39 +6,39 @@ we have been making good and bad decisions that impacted our developer experienc
 Some of them are worth sharing.
 
 ### Contents
-1. [Project Structure. Consistent & predictable](https://github.com/zhanymkanov/fastapi-best-practices#1-project-structure-consistent--predictable)
-2. [Excessively use Pydantic for data validation](https://github.com/zhanymkanov/fastapi-best-practices#2-excessively-use-pydantic-for-data-validation)
-3. [Use dependencies for data validation vs DB](https://github.com/zhanymkanov/fastapi-best-practices#3-use-dependencies-for-data-validation-vs-db)
-4. [Chain dependencies](https://github.com/zhanymkanov/fastapi-best-practices#4-chain-dependencies)
+1. [Project Structure. Consistent & predictable.](https://github.com/zhanymkanov/fastapi-best-practices#1-project-structure-consistent--predictable)
+2. [Excessively use Pydantic for data validation.](https://github.com/zhanymkanov/fastapi-best-practices#2-excessively-use-pydantic-for-data-validation)
+3. [Use dependencies for data validation vs DB.](https://github.com/zhanymkanov/fastapi-best-practices#3-use-dependencies-for-data-validation-vs-db)
+4. [Chain dependencies.](https://github.com/zhanymkanov/fastapi-best-practices#4-chain-dependencies)
 5. [Decouple & Reuse dependencies. Dependency calls are cached.](https://github.com/zhanymkanov/fastapi-best-practices#5-decouple--reuse-dependencies-dependency-calls-are-cached)
-6. [Follow the REST](https://github.com/zhanymkanov/fastapi-best-practices#6-follow-the-rest)
-7. [Don't make your routes async, if you have only blocking I/O operations](https://github.com/zhanymkanov/fastapi-best-practices#7-dont-make-your-routes-async-if-you-have-only-blocking-io-operations)
-8. [Custom base model from day 0](https://github.com/zhanymkanov/fastapi-best-practices#8-custom-base-model-from-day-0)
-9. [Docs](https://github.com/zhanymkanov/fastapi-best-practices#9-docs)
-10. [Use Pydantic's BaseSettings for configs](https://github.com/zhanymkanov/fastapi-best-practices#10-use-pydantics-basesettings-for-configs)
-11. [SQLAlchemy: Set DB keys naming convention](https://github.com/zhanymkanov/fastapi-best-practices#11-sqlalchemy-set-db-keys-naming-convention)
-12. [Migrations. Alembic](https://github.com/zhanymkanov/fastapi-best-practices#12-migrations-alembic)
-13. [Set DB tables naming convention](https://github.com/zhanymkanov/fastapi-best-practices#13-set-db-tables-naming-convention)
-14. [Set tests client async from day 0](https://github.com/zhanymkanov/fastapi-best-practices#14-set-tests-client-async-from-day-0)
-15. [BackgroundTasks > asyncio.create_task](https://github.com/zhanymkanov/fastapi-best-practices#15-backgroundtasks--asynciocreate_task)
-16. [Typing is important](https://github.com/zhanymkanov/fastapi-best-practices#16-typing-is-important)
-17. [Save files in chunk](https://github.com/zhanymkanov/fastapi-best-practices#17-save-files-in-chunk)
-18. [Be careful with dynamic pydantic fields](https://github.com/zhanymkanov/fastapi-best-practices#18-be-careful-with-dynamic-pydantic-fields)
+6. [Follow the REST.](https://github.com/zhanymkanov/fastapi-best-practices#6-follow-the-rest)
+7. [Don't make your routes async, if you have only blocking I/O operations.](https://github.com/zhanymkanov/fastapi-best-practices#7-dont-make-your-routes-async-if-you-have-only-blocking-io-operations)
+8. [Custom base model from day 0.](https://github.com/zhanymkanov/fastapi-best-practices#8-custom-base-model-from-day-0)
+9. [Docs.](https://github.com/zhanymkanov/fastapi-best-practices#9-docs)
+10. [Use Pydantic's BaseSettings for configs.](https://github.com/zhanymkanov/fastapi-best-practices#10-use-pydantics-basesettings-for-configs)
+11. [SQLAlchemy: Set DB keys naming convention.](https://github.com/zhanymkanov/fastapi-best-practices#11-sqlalchemy-set-db-keys-naming-convention)
+12. [Migrations. Alembic.](https://github.com/zhanymkanov/fastapi-best-practices#12-migrations-alembic)
+13. [Set DB tables naming convention.](https://github.com/zhanymkanov/fastapi-best-practices#13-set-db-tables-naming-convention)
+14. [Set tests client async from day 0.](https://github.com/zhanymkanov/fastapi-best-practices#14-set-tests-client-async-from-day-0)
+15. [BackgroundTasks > asyncio.create_task.](https://github.com/zhanymkanov/fastapi-best-practices#15-backgroundtasks--asynciocreate_task)
+16. [Typing is important.](https://github.com/zhanymkanov/fastapi-best-practices#16-typing-is-important)
+17. [Save files in chunk.](https://github.com/zhanymkanov/fastapi-best-practices#17-save-files-in-chunk)
+18. [Be careful with dynamic pydantic fields.](https://github.com/zhanymkanov/fastapi-best-practices#18-be-careful-with-dynamic-pydantic-fields)
 19. ~~SQL-first, Pydantic-second, Custom-third~~ 
-20. [Validate url source (if users are able to upload files and send urls)](https://github.com/zhanymkanov/fastapi-best-practices#20-validate-url-source-if-users-are-able-to-upload-files-and-send-urls)
-21. [root_validator to use multiple columns during validation](https://github.com/zhanymkanov/fastapi-best-practices#21-root_validator-to-use-multiple-columns-during-validation)
+20. [Validate url source (if users are able to upload files and send urls).](https://github.com/zhanymkanov/fastapi-best-practices#20-validate-url-source-if-users-are-able-to-upload-files-and-send-urls)
+21. [root_validator to use multiple columns during validation.](https://github.com/zhanymkanov/fastapi-best-practices#21-root_validator-to-use-multiple-columns-during-validation)
 22. ~~pre=True if data need to be pre-handled before validation~~
 23. ~~raise a ValueError in pydantic, if schema faces http client~~
 24. ~~remember fastapi response modeling~~
-25. if must use sdk, but it's not async, use threadpools
+25. if must use sdk, but it's not async, use threadpools.
 26. ~~use linters~~
 
 ### 1. Project Structure. Consistent & predictable
 There are many ways to structure the project, but the best structure is a structure that is consistent, straightforward and has no surprises.
 - If looking at the project structure doesn't give you an idea of what the project is about, then the structure might be unclear. 
 - If you have to open packages to understand what modules are located in it, then your structure is unclear.
-- If looking at the module's location and its name doesn't give you an idea of what's inside it, then your structure is bad.
 - If the frequency and location of the files feels random, then your project structure is bad. 
+- If looking at the module's location and its name doesn't give you an idea of what's inside it, then your structure is very bad.
 
 Although, the project structure, where we separate files by their type (e.g. api, crud, models, schemas)
 presented by [@tiangolo](https://github.com/tiangolo) is good for microservices or projects with fewer scopes, 
@@ -553,7 +553,7 @@ We use `date` + `slug` pattern, e.g. `2022-08-24_post_content_idx.py`
 file_template = %%(year)d-%%(month).2d-%%(day).2d_%%(slug)s
 ```
 ### 13. Set DB tables naming convention
-Being consistent with names was important. Some of the rules we followed:
+Being consistent with names is important. Some rules we followed:
 1. lower_case_snake
 2. singular form
 3. group similar tables with module prefix, e.g. `payment_account`, `payment_bill`, `post`, `post_like`
@@ -590,10 +590,10 @@ async def test_create_post(client: TestClient):
 
     assert resp.status_code == 201
 ```
-Unless you have sync db connection (excuse me?) or aren't planning to write integration tests.
+Unless you have sync db connections (excuse me?) or aren't planning to write integration tests.
 ### 15. BackgroundTasks > asyncio.create_task
 BackgroundTasks can [effectively run](https://github.com/encode/starlette/blob/31164e346b9bd1ce17d968e1301c3bb2c23bb418/starlette/background.py#L25) both blocking and non-blocking I/O operations. 
-Since the API for sending these tasks will be the same (no need to await coroutines), 
+Since the API for sending these tasks will be the same (i.e. both coroutines and functions are not awaited), 
 it's preferable to use starlette's background tasks.
 Don't use it for CPU intensive tasks.
 ```python
