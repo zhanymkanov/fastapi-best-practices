@@ -18,7 +18,7 @@ Some of them are worth sharing.
 10. [Use Pydantic's BaseSettings for configs.](https://github.com/zhanymkanov/fastapi-best-practices#10-use-pydantics-basesettings-for-configs)
 11. [SQLAlchemy: Set DB keys naming convention.](https://github.com/zhanymkanov/fastapi-best-practices#11-sqlalchemy-set-db-keys-naming-convention)
 12. [Migrations. Alembic.](https://github.com/zhanymkanov/fastapi-best-practices#12-migrations-alembic)
-13. [Set DB tables naming convention.](https://github.com/zhanymkanov/fastapi-best-practices#13-set-db-tables-naming-convention)
+13. [Set DB naming convention.](https://github.com/zhanymkanov/fastapi-best-practices#13-set-db-naming-convention)
 14. [Set tests client async from day 0.](https://github.com/zhanymkanov/fastapi-best-practices#14-set-tests-client-async-from-day-0)
 15. [BackgroundTasks > asyncio.create_task.](https://github.com/zhanymkanov/fastapi-best-practices#15-backgroundtasks--asynciocreate_task)
 16. [Typing is important.](https://github.com/zhanymkanov/fastapi-best-practices#16-typing-is-important)
@@ -542,20 +542,21 @@ POSTGRES_INDEXES_NAMING_CONVENTION = {
 metadata = MetaData(naming_convention=POSTGRES_INDEXES_NAMING_CONVENTION)
 ```
 ### 12. Migrations. Alembic.
-1. Migrations must be static and easily revertable. 
+1. Migrations must be static and revertable.
 If your migrations depend on dynamically generated data,
-make sure the only thing that changes there is the data itself, not its structure.
-2. Generate migrations with descriptive name & slug. Slug is required and should explain the changes.
+make sure the only thing that is dynamic there is the data itself, not its structure.
+2. Generate migrations with descriptive names & slugs. Slug is required and should explain the changes.
+
 Set human-readable file template for new migrations. 
-We use `date` + `slug` pattern, e.g. `2022-08-24_post_content_idx.py`
+We use `*date*_*slug*.py` pattern, e.g. `2022-08-24_post_content_idx.py`
 ```
 # alembic.ini
 file_template = %%(year)d-%%(month).2d-%%(day).2d_%%(slug)s
 ```
-### 13. Set DB tables naming convention
+### 13. Set DB naming convention
 Being consistent with names is important. Some rules we followed:
 1. lower_case_snake
-2. singular form
+2. singular form (e.g. `post`, `post_like`, `user_playlist`)
 3. group similar tables with module prefix, e.g. `payment_account`, `payment_bill`, `post`, `post_like`
 4. stay consistent across tables, but concrete namings are ok, e.g.
    1. use `profile_id` in all tables, but if some of them need only profiles that are creators, use `creator_id`
@@ -593,7 +594,7 @@ async def test_create_post(client: TestClient):
 Unless you have sync db connections (excuse me?) or aren't planning to write integration tests.
 ### 15. BackgroundTasks > asyncio.create_task
 BackgroundTasks can [effectively run](https://github.com/encode/starlette/blob/31164e346b9bd1ce17d968e1301c3bb2c23bb418/starlette/background.py#L25) both blocking and non-blocking I/O operations. 
-Since the API for sending these tasks will be the same (i.e. both coroutines and functions are not awaited), 
+Since the API for sending these tasks will be the same (i.e. coroutines are not explicitly awaited), 
 it's preferable to use starlette's background tasks.
 Don't use it for CPU intensive tasks.
 ```python
@@ -635,7 +636,7 @@ async def save_video(video_file: UploadFile):
          await f.write(chunk)
 ```
 ### 18. Be careful with dynamic pydantic fields
-If you have a pydantic field that can accept multiple types, be sure validator explicitly knows the difference between those types.
+If you have a pydantic field that can accept a union of types, be sure validator explicitly knows the difference between those types.
 ```python
 from pydantic import BaseModel
 
@@ -691,7 +692,7 @@ class Video(BaseModel):
    
    @root_validator(pre=True)
    def has_only_video_fields(cls, data: dict):
-      """Silly and ugly solution to validate data has only article fields."""
+      """Silly and ugly solution to validate data has only video fields."""
       fields = set(data.keys())
       if fields != {"text", "extra", "video_id"}:
          raise ValueError("invalid fields")
@@ -703,6 +704,7 @@ class Post(BaseModel):
    content: Article | Video
 ```
 3. Use Pydantic's Smart Union (>v1.9) if fields are simple
+
 It's a good solution if the fields are simple like `int` or `bool`, 
 but it doesn't work for complex fields like classes.
 
