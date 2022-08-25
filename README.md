@@ -18,21 +18,19 @@ Some of them are worth sharing.
 10. [Use Pydantic's BaseSettings for configs](https://github.com/zhanymkanov/fastapi-best-practices#10-use-pydantics-basesettings-for-configs)
 11. [SQLAlchemy: Set DB keys naming convention from day 0](https://github.com/zhanymkanov/fastapi-best-practices#11-sqlalchemy-set-db-keys-naming-convention-from-day-0)
 12. [Set DB table naming convention immediately from day 0](https://github.com/zhanymkanov/fastapi-best-practices#12-set-db-table-naming-convention-immediately-from-day-0)
-13. ~~Set UUIDs within the app~~
-14. [Set tests client async from day 0](https://github.com/zhanymkanov/fastapi-best-practices#14-set-tests-client-async-from-day-0)
-15. ~~Set postgres identity from day 0~~
-16. [Use BackgroundTasks](https://github.com/zhanymkanov/fastapi-best-practices#16-use-backgroundtasks)
-17. [Typing is important](https://github.com/zhanymkanov/fastapi-best-practices#17-typing-is-important)
-18. [Don't hope your clients will send small BLOBs. Save files in chunk](https://github.com/zhanymkanov/fastapi-best-practices#18-dont-hope-your-clients-will-send-small-blobs-save-files-in-chunk)
-19. [Be careful with dynamic pydantic fields](https://github.com/zhanymkanov/fastapi-best-practices#19-be-careful-with-dynamic-pydantic-fields)
-20. ~~SQL-first, Pydantic-second~~ 
-21. ~~Validate file formats~~
-22. [Validate url source (if users are able to upload files)](https://github.com/zhanymkanov/fastapi-best-practices#22-validate-url-source-if-users-are-able-to-upload-files)
-23. [root_validator to use multiple columns during validation](https://github.com/zhanymkanov/fastapi-best-practices#23-root_validator-to-use-multiple-columns-during-validation)
-24. ~~pre=True if data need to be pre-handled before validation~~
-25. ~~raise a ValueError in pydantic, if schema faces http client~~
-26. ~~remember fastapi response modeling~~
-27. if must use sdk, but it's not async, use threadpools
+13. [Set tests client async from day 0](https://github.com/zhanymkanov/fastapi-best-practices#14-set-tests-client-async-from-day-0)
+14. [BackgroundTasks > asyncio.create_task](https://github.com/zhanymkanov/fastapi-best-practices#16-use-backgroundtasks)
+15. [Typing is important](https://github.com/zhanymkanov/fastapi-best-practices#17-typing-is-important)
+16. [Save files in chunk](https://github.com/zhanymkanov/fastapi-best-practices#18-dont-hope-your-clients-will-send-small-blobs-save-files-in-chunk)
+17. [Be careful with dynamic pydantic fields](https://github.com/zhanymkanov/fastapi-best-practices#19-be-careful-with-dynamic-pydantic-fields)
+18. ~~SQL-first, Pydantic-second, Custom-third~~ 
+19. [Validate url source (if users are able to upload files)](https://github.com/zhanymkanov/fastapi-best-practices#22-validate-url-source-if-users-are-able-to-upload-files)
+20. [root_validator to use multiple columns during validation](https://github.com/zhanymkanov/fastapi-best-practices#23-root_validator-to-use-multiple-columns-during-validation)
+21. ~~pre=True if data need to be pre-handled before validation~~
+22. ~~raise a ValueError in pydantic, if schema faces http client~~
+23. ~~remember fastapi response modeling~~
+24. if must use sdk, but it's not async, use threadpools
+25. ~~use linters~~
 
 ### 1. Project Structure. Consistent & predictable
 There are many ways to structure the project, but the best structure is a structure that is consistent, straightforward and has no surprises.
@@ -42,7 +40,7 @@ There are many ways to structure the project, but the best structure is a struct
 - If the frequency and location of the files feels random, then your project structure is bad. 
 
 Although, the project structure, where we separate files by their type (e.g. api, crud, models, schemas)
-presented by [@tiangolo](https://github.com/tiangolo) is perfect for microservices or projects with fewer scopes, 
+presented by [@tiangolo](https://github.com/tiangolo) is good for microservices or projects with fewer scopes, 
 we couldn't fit it into our monolith with a lot of domains and modules. 
 Structure that I found more scalable and evolvable is inspired by Netflix's [Dispatch](https://github.com/Netflix/dispatch) with some little modifications.
 ```
@@ -336,7 +334,7 @@ Use /me endpoints for users own resources (e.g. `GET /profiles/me`, `GET /users/
 
 ### 7. Don't make your routes async, if you have only blocking I/O operations
 Under the hood, FastAPI can [effectively handle](https://fastapi.tiangolo.com/async/#path-operation-functions) both async and sync I/O operations. 
-- FastAPI calls sync routes in the [threadpool](https://en.wikipedia.org/wiki/Thread_pool) 
+- FastAPI runs `sync` routes in the [threadpool](https://en.wikipedia.org/wiki/Thread_pool) 
 and blocking I/O operations won't stop [event loop](https://docs.python.org/3/library/asyncio-eventloop.html) 
 from executing the tasks. 
 - Otherwise, if the route is defined as `async` then it's called regularly via `await` 
@@ -566,7 +564,7 @@ Being consistent with names was important. Some of the rules we followed:
 
 ### 14. Set tests client async from day 0
 Writing integration tests with DB will most likely lead to messed up event loop errors in the future.
-Set the async test client immediately, e.g. [asyn_asgi_testclient](https://github.com/vinissimus/async-asgi-testclient) or [httpx](https://github.com/encode/starlette/issues/652)
+Set the async test client immediately, e.g. [async_asgi_testclient](https://github.com/vinissimus/async-asgi-testclient) or [httpx](https://github.com/encode/starlette/issues/652)
 ```python
 import pytest
 from async_asgi_testclient import TestClient
@@ -611,7 +609,7 @@ async def send_user_email(worker: BackgroundTasks, user_id: UUID4):
     worker.add_task(notifications_service.send_email, user_id)  # send email after responding client
     return {"status": "ok"}
 ```
-### 17. Typing is important
+### 16. Typing is important
 FastAPI, Pydantic, and modern IDEs encourage to take use of type hints.
 
 **Without Type Hints**
@@ -622,7 +620,8 @@ FastAPI, Pydantic, and modern IDEs encourage to take use of type hints.
 
 <img src="images/type_hints.png" width="400" height="auto">
 
-### 18. Don't hope your clients will send small BLOBs. Save files in chunk.
+### 17. Save files in chunk.
+Don't hope your clients will send small files.
 ```python
 import aiofiles
 from fastapi import UploadFile
@@ -634,7 +633,7 @@ async def save_video(video_file: UploadFile):
      while chunk := await video_file.read(DEFAULT_CHUNK_SIZE):
          await f.write(chunk)
 ```
-### 19. Be careful with dynamic pydantic fields
+### 18. Be careful with dynamic pydantic fields
 If you have a pydantic field that can accept multiple types, be sure validator explicitly knows the difference between those types.
 ```python
 from pydantic import BaseModel
@@ -741,9 +740,8 @@ print(type(p.field_2))
 print(type(p.content))
 # OUTPUT: Article
 ```
-### 20. SQL-first, Pydantic-second
-### 21. Validate file formats
-### 22. Validate url source (if users are able to upload files)
+### 19. SQL-first, Pydantic-second, Custom-last
+### 20. Validate url source (if users are able to upload files and send urls)
 Bad users could send strange urls for user facing public objects.
 ```python
 from pydantic import AnyUrl, BaseModel
@@ -766,7 +764,7 @@ class Post(BaseModel):
     thumbnail_url: CompanyMediaUrl
 
 ```
-### 23. root_validator to use multiple columns during validation
+### 21. root_validator to use multiple columns during validation
 ```python
 from pydantic import BaseModel, root_validator
 
@@ -783,11 +781,10 @@ class Profile(BaseModel):
         
         return data
 ```
-### 24. pre if data need to be pre-handled before validation
-### 25. you can just raise a ValueError in pydantic schemas, if schemas faces http client 
+### 22. pre if data need to be pre-handled before validation
+### 23. you can just raise a ValueError in pydantic schemas, if schemas faces http client 
 it wil return a nice response
-### 26. don't forget that fastapi converts response Model to Dict then to Model then to JSON
+### 24. don't forget that fastapi converts response Model to Dict then to Model then to JSON
 it may lead to bugs like model can parse only raw data (e.g. forced data aggregation for raw data)
-### 27. if must use sdk, but it's not async, use threadpools
-### 28. use linters (black, isort, autoflake)
-### 29. set logs from day 0
+### 25. if must use sdk, but it's not async, use threadpools
+### 26. use linters (black, isort, autoflake)
