@@ -592,9 +592,11 @@ async def test_create_post(client: TestClient):
     assert resp.status_code == 201
 ```
 Unless you have sync db connection (excuse me?) or aren't planning to write integration tests.
-### 15. Set postgres identity from day 0
-### 16. Use BackgroundTasks
-They are stable enough for async (delayed) tasks
+### 15. BackgroundTasks > asyncio.create_task
+BackgroundTasks can [effectively run](https://github.com/encode/starlette/blob/31164e346b9bd1ce17d968e1301c3bb2c23bb418/starlette/background.py#L25) both blocking and non-blocking I/O operations. 
+Since the API for sending these tasks will be the same (no need to await coroutines), 
+it's preferable to use starlette's background tasks.
+Don't use it for CPU intensive tasks.
 ```python
 from fastapi import BackgroundTasks
 from pydantic import UUID4
