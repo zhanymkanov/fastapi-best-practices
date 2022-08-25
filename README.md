@@ -783,8 +783,8 @@ class Profile(BaseModel):
         return data
 ```
 ### 22. pre if data need to be pre-handled before validation
-### 23. you can just raise a ValueError in pydantic schemas, if schemas faces http client 
-it wil return a nice response
+### 23. you can just raise a ValueError in pydantic schemas, if schemas face http client 
+it wil return a detailed response of the failed fields
 ### 24. don't forget that fastapi converts response Model to Dict then to Model then to JSON
 it may lead to bugs like model can parse only raw data (e.g. forced data aggregation for raw data)
 ### 25. if must use sdk, but it's not async, use threadpools
