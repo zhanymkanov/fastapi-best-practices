@@ -16,21 +16,22 @@ Some of them are worth sharing.
 8. [Custom base model from day 0](https://github.com/zhanymkanov/fastapi-best-practices#8-custom-base-model-from-day-0)
 9. [Docs](https://github.com/zhanymkanov/fastapi-best-practices#9-docs)
 10. [Use Pydantic's BaseSettings for configs](https://github.com/zhanymkanov/fastapi-best-practices#10-use-pydantics-basesettings-for-configs)
-11. [SQLAlchemy: Set DB keys naming convention from day 0](https://github.com/zhanymkanov/fastapi-best-practices#11-sqlalchemy-set-db-keys-naming-convention-from-day-0)
-12. [Set DB table naming convention immediately from day 0](https://github.com/zhanymkanov/fastapi-best-practices#12-set-db-table-naming-convention-immediately-from-day-0)
-13. [Set tests client async from day 0](https://github.com/zhanymkanov/fastapi-best-practices#14-set-tests-client-async-from-day-0)
-14. [BackgroundTasks > asyncio.create_task](https://github.com/zhanymkanov/fastapi-best-practices#16-use-backgroundtasks)
-15. [Typing is important](https://github.com/zhanymkanov/fastapi-best-practices#17-typing-is-important)
-16. [Save files in chunk](https://github.com/zhanymkanov/fastapi-best-practices#18-dont-hope-your-clients-will-send-small-blobs-save-files-in-chunk)
-17. [Be careful with dynamic pydantic fields](https://github.com/zhanymkanov/fastapi-best-practices#19-be-careful-with-dynamic-pydantic-fields)
-18. ~~SQL-first, Pydantic-second, Custom-third~~ 
-19. [Validate url source (if users are able to upload files)](https://github.com/zhanymkanov/fastapi-best-practices#22-validate-url-source-if-users-are-able-to-upload-files)
-20. [root_validator to use multiple columns during validation](https://github.com/zhanymkanov/fastapi-best-practices#23-root_validator-to-use-multiple-columns-during-validation)
-21. ~~pre=True if data need to be pre-handled before validation~~
-22. ~~raise a ValueError in pydantic, if schema faces http client~~
-23. ~~remember fastapi response modeling~~
-24. if must use sdk, but it's not async, use threadpools
-25. ~~use linters~~
+11. [SQLAlchemy: Set DB keys naming convention](https://github.com/zhanymkanov/fastapi-best-practices#11-sqlalchemy-set-db-keys-naming-convention)
+12. [Migrations. Alembic](https://github.com/zhanymkanov/fastapi-best-practices#12-migrations-alembic)
+13. [Set DB tables naming convention](https://github.com/zhanymkanov/fastapi-best-practices#13-set-db-tables-naming-convention)
+14. [Set tests client async from day 0](https://github.com/zhanymkanov/fastapi-best-practices#14-set-tests-client-async-from-day-0)
+15. [BackgroundTasks > asyncio.create_task](https://github.com/zhanymkanov/fastapi-best-practices#15-backgroundtasks--asynciocreate_task)
+16. [Typing is important](https://github.com/zhanymkanov/fastapi-best-practices#16-typing-is-important)
+17. [Save files in chunk](https://github.com/zhanymkanov/fastapi-best-practices#17-save-files-in-chunk)
+18. [Be careful with dynamic pydantic fields](https://github.com/zhanymkanov/fastapi-best-practices#18-be-careful-with-dynamic-pydantic-fields)
+19. ~~SQL-first, Pydantic-second, Custom-third~~ 
+20. [Validate url source (if users are able to upload files and send urls)](https://github.com/zhanymkanov/fastapi-best-practices#20-validate-url-source-if-users-are-able-to-upload-files-and-send-urls)
+21. [root_validator to use multiple columns during validation](https://github.com/zhanymkanov/fastapi-best-practices#21-root_validator-to-use-multiple-columns-during-validation)
+22. ~~pre=True if data need to be pre-handled before validation~~
+23. ~~raise a ValueError in pydantic, if schema faces http client~~
+24. ~~remember fastapi response modeling~~
+25. if must use sdk, but it's not async, use threadpools
+26. ~~use linters~~
 
 ### 1. Project Structure. Consistent & predictable
 There are many ways to structure the project, but the best structure is a structure that is consistent, straightforward and has no surprises.
