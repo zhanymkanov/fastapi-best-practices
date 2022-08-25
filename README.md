@@ -528,7 +528,8 @@ class AppSettings(BaseSettings):
     IS_GOOD_ENV: bool = True
     ALLOWED_CORS_ORIGINS: set[AnyUrl]
 ```
-### 11. SQLAlchemy: Set DB keys naming convention from day 0
+### 11. SQLAlchemy: Set DB keys naming convention
+Explicitly setting the indexes' namings according to your database's convention is preferable over sqlalchemy's. 
 ```python
 from sqlalchemy import MetaData
 
@@ -541,9 +542,28 @@ POSTGRES_INDEXES_NAMING_CONVENTION = {
 }
 metadata = MetaData(naming_convention=POSTGRES_INDEXES_NAMING_CONVENTION)
 ```
-### 12. Set DB table naming convention immediately from day 0
-### 13. Set UUIDs within the app
-Setting them in database makes it harder to write integration tests.
+### 12. Migrations. Alembic.
+1. Migrations must be static and easily revertable. 
+If your migrations depend on dynamically generated data,
+make sure the only thing that changes there is the data itself, not its structure.
+2. Generate migrations with descriptive name & slug. Slug is required and should explain the changes.
+Set human-readable file template for new migrations. 
+We use `date` + `slug` pattern, e.g. `2022-08-24_post_content_idx.py`
+```
+# alembic.ini
+file_template = %%(year)d-%%(month).2d-%%(day).2d_%%(slug)s
+```
+### 13. Set DB tables naming convention
+Being consistent with names was important. Some of the rules we followed:
+1. lower_case_snake
+2. singular form
+3. group similar tables with module prefix, e.g. `payment_account`, `payment_bill`, `post`, `post_like`
+4. stay consistent across tables, but concrete namings are ok, e.g.
+   1. use `profile_id` in all tables, but if some of them need only profiles that are creators, use `creator_id`
+   2. use `post_id` for all abstract tables like `post_like`, `post_view`, but use concrete naming in relevant modules like `course_id` in `chapters.course_id`
+5. `_at` suffix for datetime
+6. `_date` suffix for date
+
 ### 14. Set tests client async from day 0
 Writing integration tests with DB will most likely lead to messed up event loop errors in the future.
 Set the async test client immediately, e.g. [asyn_asgi_testclient](https://github.com/vinissimus/async-asgi-testclient) or [httpx](https://github.com/encode/starlette/issues/652)
