@@ -111,7 +111,7 @@ fastapi-project
 3. When package requires services or dependencies or constants from other packages - import them with explicit module name
 ```python
 from src.auth import constants as auth_constants
-from src.notifictions import service as notification_service
+from src.notifications import service as notification_service
 from src.posts.constants import ErrorCode as PostsErrorCode  # in case we have Standard ErrorCode in constants module of each package
 ```
 
