@@ -271,6 +271,9 @@ async def valid_active_creator(
     if not user["is_active"]:
         raise UserIsBanned()
     
+    if not user["is_creator"]:
+       raise UserNotCreator()
+    
     return user
         
 
@@ -320,7 +323,7 @@ async def get_user_profile_by_id(profile: Mapping = Depends(valid_profile_id)):
     return profile
 
 # src.creators.router.py
-@router.get("/profiles/{profile_id}", response_model=ProfileResponse)
+@router.get("/creators/{profile_id}", response_model=ProfileResponse)
 async def get_user_profile_by_id(
      creator_profile: Mapping = Depends(valid_creator_id)
 ):
