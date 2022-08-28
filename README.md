@@ -596,10 +596,10 @@ async def test_create_post(client: TestClient):
 ```
 Unless you have sync db connections (excuse me?) or aren't planning to write integration tests.
 ### 15. BackgroundTasks > asyncio.create_task
-BackgroundTasks can [effectively run](https://github.com/encode/starlette/blob/31164e346b9bd1ce17d968e1301c3bb2c23bb418/starlette/background.py#L25) both blocking and non-blocking I/O operations. 
-Since the API for sending these tasks will be the same (i.e. coroutines are not explicitly awaited), 
-it's preferable to use starlette's background tasks.
-Don't use it for CPU intensive tasks.
+BackgroundTasks can [effectively run](https://github.com/encode/starlette/blob/31164e346b9bd1ce17d968e1301c3bb2c23bb418/starlette/background.py#L25)
+both blocking and non-blocking I/O operations the same way it handles routes (`sync` functions are run in a threadpool, while `async` ones are awaited later)
+- Don't lie to the worker and don't mark blocking I/O operations as `async`
+- Don't use it for heavy CPU intensive tasks.
 ```python
 from fastapi import BackgroundTasks
 from pydantic import UUID4
