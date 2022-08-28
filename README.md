@@ -34,13 +34,13 @@ Some of them are worth sharing.
 25. [Bonus Section.](https://github.com/zhanymkanov/fastapi-best-practices#bonus-section)
 
 ### 1. Project Structure. Consistent & predictable
-There are many ways to structure the project, but the best structure is a structure that is consistent, straightforward and has no surprises.
+There are many ways to structure the project, but the best structure is a structure that is consistent, straightforward, and has no surprises.
 - If looking at the project structure doesn't give you an idea of what the project is about, then the structure might be unclear. 
-- If you have to open packages to understand what modules are located in it, then your structure is unclear.
+- If you have to open packages to understand what modules are located in them, then your structure is unclear.
 - If the frequency and location of the files feels random, then your project structure is bad. 
 - If looking at the module's location and its name doesn't give you an idea of what's inside it, then your structure is very bad.
 
-Although, the project structure, where we separate files by their type (e.g. api, crud, models, schemas)
+Although the project structure, where we separate files by their type (e.g. api, crud, models, schemas)
 presented by [@tiangolo](https://github.com/tiangolo) is good for microservices or projects with fewer scopes, 
 we couldn't fit it into our monolith with a lot of domains and modules. 
 Structure that I found more scalable and evolvable is inspired by Netflix's [Dispatch](https://github.com/Netflix/dispatch) with some little modifications.
@@ -108,7 +108,7 @@ fastapi-project
    7. `config.py` - e.g. env vars
    8. `utils.py` - non-business logic functions, e.g. response normalization, data enrichment, etc.
    9. `exceptions` - module specific exceptions, e.g. `PostNotFound`, `InvalidUserData`
-3. When package requires services or dependencies or constants from other packages - import them with explicit module name
+3. When package requires services or dependencies or constants from other packages - import them with explicit an module name
 ```python
 from src.auth import constants as auth_constants
 from src.notifications import service as notification_service
@@ -118,8 +118,8 @@ from src.posts.constants import ErrorCode as PostsErrorCode  # in case we have S
 ### 2. Excessively use Pydantic for data validation
 Pydantic has a rich set of features to validate and transform data. 
 
-In addition to regular features like required, non-required fields and default data, 
-it has built-in comprehensive data processing params like regex, enums for limited allowed options, length validation, email validation, etc.
+In addition to regular features like required & non-required fields with default values, 
+it has built-in comprehensive data processing tools like regex, enums for limited allowed options, length validation, email validation, etc.
 ```python3
 from enum import Enum
 from pydantic import AnyUrl, BaseModel, EmailStr, Field, constr
@@ -141,7 +141,7 @@ class UserBase(BaseModel):
 ```
 ### 3. Use dependencies for data validation vs DB
 Pydantic can only validate the values of client input. 
-Use dependencies to validate data against database requirements like email already exists, user not found, etc. 
+Use dependencies to validate data against database constraints like email already exists, user not found, etc. 
 ```python3
 # dependencies.py
 async def valid_post_id(post_id: UUID4) -> Mapping:
@@ -219,7 +219,7 @@ async def get_user_post(post: Mapping = Depends(valid_owned_post)):
 ```
 ### 5. Decouple & Reuse dependencies. Dependency calls are cached.
 Dependencies can be reused multiple times, and they won't be recalculated - FastAPI caches their result by default,
-e.g. if we have a dependency which calls service `get_post_by_id`, we won't be visiting DB each time we call this dependency - only the first function call.
+i.e. if we have a dependency that calls service `get_post_by_id`, we won't be visiting DB each time we call this dependency - only the first function call.
 
 Knowing this, we can easily decouple dependencies onto multiple smaller functions that operate on a smaller scope and are easier to reuse in other routes.
 For example, in the code below we are using `parse_jwt_data` three times:
@@ -339,13 +339,13 @@ Use /me endpoints for users own resources (e.g. `GET /profiles/me`, `GET /users/
 ### 7. Don't make your routes async, if you have only blocking I/O operations
 Under the hood, FastAPI can [effectively handle](https://fastapi.tiangolo.com/async/#path-operation-functions) both async and sync I/O operations. 
 - FastAPI runs `sync` routes in the [threadpool](https://en.wikipedia.org/wiki/Thread_pool) 
-and blocking I/O operations won't stop [event loop](https://docs.python.org/3/library/asyncio-eventloop.html) 
+and blocking I/O operations won't stop the [event loop](https://docs.python.org/3/library/asyncio-eventloop.html) 
 from executing the tasks. 
-- Otherwise, if the route is defined as `async` then it's called regularly via `await` 
+- Otherwise, if the route is defined `async` then it's called regularly via `await` 
 and FastAPI trusts you to do only non-blocking I/O operations.
 
 The caveat is if you fail that trust and execute blocking operations within async routes, 
-event loop will not be able to run the next tasks until that blocking operation is done.
+the event loop will not be able to run the next tasks until that blocking operation is done.
 ```python
 import asyncio
 import time
@@ -399,9 +399,9 @@ async def perfect_ping():
    6. When `service.async_get_pong` is done, server returns a response to the client
 
 The caveat is that operations that are non-blocking awaitables or sent to thread pool must be I/O intensive tasks (e.g. open file, db call, external API call).
-- Awaiting CPU intensive tasks (e.g. heavy calculations, data processing, video transcoding) is worthless, since CPU has to work to finish the tasks, 
+- Awaiting CPU-intensive tasks (e.g. heavy calculations, data processing, video transcoding) is worthless since the CPU has to work to finish the tasks, 
 while I/O operations are external and server does nothing while waiting for that operations to finish, thus it can go to the next tasks.
-- Running CPU intensive tasks in other threads also isn't effective, because of [GIL](https://realpython.com/python-gil/). 
+- Running CPU-intensive tasks in other threads also isn't effective, because of [GIL](https://realpython.com/python-gil/). 
 In short, GIL allows only one thread to work at a time, which makes it useless for CPU tasks. 
 - If you want to optimize CPU intensive tasks you should send them to workers in another process.
 
@@ -549,9 +549,7 @@ metadata = MetaData(naming_convention=POSTGRES_INDEXES_NAMING_CONVENTION)
 If your migrations depend on dynamically generated data,
 make sure the only thing that is dynamic there is the data itself, not its structure.
 2. Generate migrations with descriptive names & slugs. Slug is required and should explain the changes.
-
-Set human-readable file template for new migrations. 
-We use `*date*_*slug*.py` pattern, e.g. `2022-08-24_post_content_idx.py`
+3. Set human-readable file template for new migrations. We use `*date*_*slug*.py` pattern, e.g. `2022-08-24_post_content_idx.py`
 ```
 # alembic.ini
 file_template = %%(year)d-%%(month).2d-%%(day).2d_%%(slug)s
@@ -601,13 +599,15 @@ both blocking and non-blocking I/O operations the same way it handles routes (`s
 - Don't lie to the worker and don't mark blocking I/O operations as `async`
 - Don't use it for heavy CPU intensive tasks.
 ```python
-from fastapi import BackgroundTasks
+from fastapi import APIRouter, BackgroundTasks
 from pydantic import UUID4
 
 from src.notifications import service as notifications_service
 
 
-# router.py
+router = APIRouter()
+
+
 @router.post("/users/{user_id}/email")
 async def send_user_email(worker: BackgroundTasks, user_id: UUID4):
     """Send email to user"""
@@ -625,7 +625,7 @@ FastAPI, Pydantic, and modern IDEs encourage to take use of type hints.
 
 <img src="images/type_hints.png" width="400" height="auto">
 
-### 17. Save files in chunk.
+### 17. Save files in chunks.
 Don't hope your clients will send small files.
 ```python
 import aiofiles
@@ -639,7 +639,7 @@ async def save_video(video_file: UploadFile):
          await f.write(chunk)
 ```
 ### 18. Be careful with dynamic pydantic fields
-If you have a pydantic field that can accept a union of types, be sure validator explicitly knows the difference between those types.
+If you have a pydantic field that can accept a union of types, be sure the validator explicitly knows the difference between those types.
 ```python
 from pydantic import BaseModel
 
@@ -711,6 +711,7 @@ class Post(BaseModel):
 It's a good solution if the fields are simple like `int` or `bool`, 
 but it doesn't work for complex fields like classes.
 
+Without Smart Union
 ```python
 from pydantic import BaseModel
 
@@ -727,8 +728,9 @@ print(type(p.field_2))
 # OUTPUT: int
 print(type(p.content))
 # OUTPUT: Article
-
-
+```
+With Smart Union
+```python
 class Post(BaseModel):
    field_1: bool | int
    field_2: int | str
@@ -744,7 +746,7 @@ print(p.field_1)
 print(type(p.field_2))
 # OUTPUT: str
 print(type(p.content))
-# OUTPUT: Article
+# OUTPUT: Article, because smart_union doesn't work for complex fields like classes
 ```
 ### 19. SQL-first, Pydantic-second
 - Usually, database handles data processing much faster and cleaner than CPython will ever do. 
@@ -954,7 +956,7 @@ async def root():
 [INFO] [2022-08-28 12:00:00.000030] called dict
 ```
 ### 23. If you must use sync SDK, then run it in a thread pool.
-If you have to use an SDK to interact with external service, and it's not `async`,
+If you must use an SDK to interact with external services, and it's not `async`,
 then make the HTTP calls in an external worker thread.
 
 For a fast and simple example, we could use our well-known `run_in_threadpool` from starlette.
