@@ -1,9 +1,10 @@
-## WIP: FastAPI Best Practices
+## FastAPI Best Practices
 Opinionated list of best practices and conventions we used at our startup.
 
 For the last 1.5 years in production,
 we have been making good and bad decisions that impacted our developer experience dramatically.
-Some of them are worth sharing.
+Some of them are worth sharing. 
+
 
 ### Contents
 1. [Project Structure. Consistent & predictable.](https://github.com/zhanymkanov/fastapi-best-practices#1-project-structure-consistent--predictable)
@@ -30,6 +31,7 @@ Some of them are worth sharing.
 22. [Don't forget FastAPI converts Response Pydantic Object](https://github.com/zhanymkanov/fastapi-best-practices#22-dont-forget-fastapi-converts-response-pydantic-object-to-dict-then-to-an-instance-of-responsemodel-then-to-dict-then-to-json)
 23. [If you must use sync SDK, then run it in a thread pool.](https://github.com/zhanymkanov/fastapi-best-practices#23-if-you-must-use-sync-sdk-then-run-it-in-a-thread-pool)
 24. [Use linters (black, isort, autoflake)](https://github.com/zhanymkanov/fastapi-best-practices#24-use-linters-black-isort-autoflake)
+25. [Bonus](https://github.com/zhanymkanov/fastapi-best-practices#bonus-section)
 
 ### 1. Project Structure. Consistent & predictable
 There are many ways to structure the project, but the best structure is a structure that is consistent, straightforward and has no surprises.
@@ -987,3 +989,10 @@ autoflake --remove-all-unused-imports --recursive --remove-unused-variables --in
 isort src tests --profile black
 black src tests
 ```
+### Bonus Section.
+Some very kind people shared their experience and best practices that are definitely worth reading.
+Check them out at [issues](https://github.com/zhanymkanov/fastapi-best-practices/issues) section of the project.
+
+For instance, [lowercase00](https://github.com/zhanymkanov/fastapi-best-practices/issues/4) 
+has shared their best practices working with permissions & auth, class-based services & views, 
+task queues, custom response serializers, configuration with dynaconf, etc.  
