@@ -923,7 +923,69 @@ async def get_creator_posts(profile_data: ProfileCreate):
 
 <img src="images/custom_bad_response.png" width="400" height="auto">
 
-### 22. don't forget that fastapi converts response Model to Dict then to Model then to JSON
-it may lead to bugs like model can parse only raw data (e.g. forced data aggregation for raw data)
-### 23. if must use sdk, but it's not async, use threadpools
-### 24. use linters (black, isort, autoflake)
+### 22. Don't forget FastAPI converts Response Pydantic Object to Dict then to an instance of ResponseModel then to Dict then to JSON
+```python
+from fastapi import FastAPI
+from pydantic import BaseModel, root_validator
+
+app = FastAPI()
+
+
+class ProfileResponse(BaseModel):
+    @root_validator
+    def debug_usage(cls, data: dict):
+        print("created pydantic model")
+
+        return data
+
+    def dict(self, *args, **kwargs):
+        print("called dict")
+        return super().dict(*args, **kwargs)
+
+
+@app.get("/", response_model=ProfileResponse)
+async def root():
+    return ProfileResponse()
+```
+**Logs Output:**
+```
+[INFO] [2022-08-28 12:00:00.000000] created pydantic model
+[INFO] [2022-08-28 12:00:00.000010] called dict
+[INFO] [2022-08-28 12:00:00.000020] created pydantic model
+[INFO] [2022-08-28 12:00:00.000030] called dict
+```
+### 23. If you must use sync SDK, then run it in a thread pool.
+If you have to use an SDK to interact with external service, and it's not `async`,
+then make the HTTP calls in an external worker thread.
+
+For a fast and simple example, we could use our well-known `run_in_threadpool` from starlette.
+```python
+from fastapi import FastAPI
+from fastapi.concurrency import run_in_threadpool
+from my_sync_library import SyncAPIClient 
+
+app = FastAPI()
+
+
+@app.get("/")
+async def call_my_sync_library():
+    my_data = await service.get_my_data()
+
+    client = SyncAPIClient()
+    await run_in_threadpool(client.make_request, data=my_data)
+```
+### 24. Use linters (black, isort, autoflake)
+With linters, you can forget about formatting the code and focus on writing the business logic.
+
+Black is the uncompromising code formatter that eliminates so many small decisions you have to make during development.
+Other linters help you write cleaner code and follow the PEP8.
+
+It's a popular good practice to use pre-commit hooks, but just using the script was ok for us.
+```shell
+#!/bin/sh -e
+set -x
+
+autoflake --remove-all-unused-imports --recursive --remove-unused-variables --in-place src tests --exclude=__init__.py
+isort src tests --profile black
+black src tests
+```
