@@ -749,8 +749,7 @@ print(type(p.content))
 ### 19. SQL-first, Pydantic-second
 - Usually, database handles data processing much faster and cleaner than CPython will ever do. 
 - It's preferable to do all the complex joins and simple data manipulations with SQL.
-- Nested objects like JSON aggregation should be done in DB.
-- Pydantic should only serialize data from db with minimum extra normalization.
+- It's preferable to aggregate JSONs in DB for responses with nested objects.
 ```python
 # src.posts.service
 from typing import Mapping
@@ -835,7 +834,7 @@ class Post(BaseModel):
        return creator
     
 # src.posts.router
-@from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends
 
 router = APIRouter()
 
@@ -847,7 +846,7 @@ async def get_creator_posts(creator: Mapping = Depends(valid_creator_id)):
    return posts
 ```
 
-If an aggregated data form DB is a simple JSON, then take a look Json field type of Pydantic,
+If an aggregated data form DB is a simple JSON, then take a look at Pydantic's `Json` field type,
 which will load raw JSON first.
 ```python
 from pydantic import BaseModel, Json
