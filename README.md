@@ -28,10 +28,10 @@ Some of them are worth sharing.
 19. [SQL-first, Pydantic-second.](https://github.com/zhanymkanov/fastapi-best-practices#19-sql-first-pydantic-second) 
 20. [Validate hosts, if users can send publicly available URLs.](https://github.com/zhanymkanov/fastapi-best-practices#20-validate-hosts-if-users-can-send-publicly-available-urls)
 21. [Raise a ValueError in custom pydantic validators, if schema directly faces the client.](https://github.com/zhanymkanov/fastapi-best-practices#21-raise-a-valueerror-in-custom-pydantic-validators-if-schema-directly-faces-the-client)
-22. [Don't forget FastAPI converts Response Pydantic Object](https://github.com/zhanymkanov/fastapi-best-practices#22-dont-forget-fastapi-converts-response-pydantic-object-to-dict-then-to-an-instance-of-responsemodel-then-to-dict-then-to-json)
+22. [Don't forget FastAPI converts Response Pydantic Object...](https://github.com/zhanymkanov/fastapi-best-practices#22-dont-forget-fastapi-converts-response-pydantic-object-to-dict-then-to-an-instance-of-responsemodel-then-to-dict-then-to-json)
 23. [If you must use sync SDK, then run it in a thread pool.](https://github.com/zhanymkanov/fastapi-best-practices#23-if-you-must-use-sync-sdk-then-run-it-in-a-thread-pool)
-24. [Use linters (black, isort, autoflake)](https://github.com/zhanymkanov/fastapi-best-practices#24-use-linters-black-isort-autoflake)
-25. [Bonus](https://github.com/zhanymkanov/fastapi-best-practices#bonus-section)
+24. [Use linters (black, isort, autoflake).](https://github.com/zhanymkanov/fastapi-best-practices#24-use-linters-black-isort-autoflake)
+25. [Bonus Section.](https://github.com/zhanymkanov/fastapi-best-practices#bonus-section)
 
 ### 1. Project Structure. Consistent & predictable
 There are many ways to structure the project, but the best structure is a structure that is consistent, straightforward and has no surprises.
@@ -989,10 +989,13 @@ autoflake --remove-all-unused-imports --recursive --remove-unused-variables --in
 isort src tests --profile black
 black src tests
 ```
-### Bonus Section.
-Some very kind people shared their experience and best practices that are definitely worth reading.
+### Bonus Section
+Some very kind people shared their own experience and best practices that are definitely worth reading.
 Check them out at [issues](https://github.com/zhanymkanov/fastapi-best-practices/issues) section of the project.
 
 For instance, [lowercase00](https://github.com/zhanymkanov/fastapi-best-practices/issues/4) 
-has shared their best practices working with permissions & auth, class-based services & views, 
+has described in details their best practices working with permissions & auth, class-based services & views, 
 task queues, custom response serializers, configuration with dynaconf, etc.  
+
+If you have something to share about your experience working with FastAPI, whether it's good or bad, 
+you are very welcome to create a new issue. It is our pleasure to read it. 
