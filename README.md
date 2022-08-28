@@ -108,7 +108,7 @@ fastapi-project
    7. `config.py` - e.g. env vars
    8. `utils.py` - non-business logic functions, e.g. response normalization, data enrichment, etc.
    9. `exceptions` - module specific exceptions, e.g. `PostNotFound`, `InvalidUserData`
-3. When package requires services or dependencies or constants from other packages - import them with explicit an module name
+3. When package requires services or dependencies or constants from other packages - import them with an explicit module name
 ```python
 from src.auth import constants as auth_constants
 from src.notifications import service as notification_service
@@ -119,7 +119,7 @@ from src.posts.constants import ErrorCode as PostsErrorCode  # in case we have S
 Pydantic has a rich set of features to validate and transform data. 
 
 In addition to regular features like required & non-required fields with default values, 
-it has built-in comprehensive data processing tools like regex, enums for limited allowed options, length validation, email validation, etc.
+Pydantic has built-in comprehensive data processing tools like regex, enums for limited allowed options, length validation, email validation, etc.
 ```python3
 from enum import Enum
 from pydantic import AnyUrl, BaseModel, EmailStr, Field, constr
@@ -218,10 +218,10 @@ async def get_user_post(post: Mapping = Depends(valid_owned_post)):
 
 ```
 ### 5. Decouple & Reuse dependencies. Dependency calls are cached.
-Dependencies can be reused multiple times, and they won't be recalculated - FastAPI caches their result by default,
+Dependencies can be reused multiple times, and they won't be recalculated - FastAPI caches dependency's result within a request's scope by default,
 i.e. if we have a dependency that calls service `get_post_by_id`, we won't be visiting DB each time we call this dependency - only the first function call.
 
-Knowing this, we can easily decouple dependencies onto multiple smaller functions that operate on a smaller scope and are easier to reuse in other routes.
+Knowing this, we can easily decouple dependencies onto multiple smaller functions that operate on a smaller domain and are easier to reuse in other routes.
 For example, in the code below we are using `parse_jwt_data` three times:
 1. `valid_owned_post`
 2. `valid_active_creator`
@@ -298,7 +298,7 @@ Developing RESTful API makes it easier to reuse dependencies in routes like thes
 
 The only caveat is to use the same variable names in the path:
 - If you have two endpoints `GET /profiles/:profile_id` and `GET /creators/:creator_id`
-that both validate whether the given profile_id exists,  but `GET /creators/:creator_id`
+that both validate whether the given `profile_id` exists,  but `GET /creators/:creator_id`
 also checks if the profile is creator, then it's better to rename `creator_id` path variable to `profile_id` and chain those two dependencies.
 ```python3
 # src.profiles.dependencies
@@ -398,7 +398,7 @@ async def perfect_ping():
    5. Event loop selects next tasks from the queue and works on them (e.g. accept new request, call db)
    6. When `service.async_get_pong` is done, server returns a response to the client
 
-The caveat is that operations that are non-blocking awaitables or sent to thread pool must be I/O intensive tasks (e.g. open file, db call, external API call).
+The second caveat is that operations that are non-blocking awaitables or are sent to thread pool must be I/O intensive tasks (e.g. open file, db call, external API call).
 - Awaiting CPU-intensive tasks (e.g. heavy calculations, data processing, video transcoding) is worthless since the CPU has to work to finish the tasks, 
 while I/O operations are external and server does nothing while waiting for that operations to finish, thus it can go to the next tasks.
 - Running CPU-intensive tasks in other threads also isn't effective, because of [GIL](https://realpython.com/python-gil/). 
@@ -412,7 +412,7 @@ In short, GIL allows only one thread to work at a time, which makes it useless f
 3. https://stackoverflow.com/questions/71516140/fastapi-runs-api-calls-in-serial-instead-of-parallel-fashion
 
 ### 8. Custom base model from day 0.
-Having a controllable global pydantic base model allows us to customize all the models within the app.
+Having a controllable global base model allows us to customize all the models within the app.
 For example, we could have a standard datetime format or add a super method for all subclasses of the base model.
 ```python
 from datetime import datetime
@@ -546,8 +546,8 @@ metadata = MetaData(naming_convention=POSTGRES_INDEXES_NAMING_CONVENTION)
 ```
 ### 12. Migrations. Alembic.
 1. Migrations must be static and revertable.
-If your migrations depend on dynamically generated data,
-make sure the only thing that is dynamic there is the data itself, not its structure.
+If your migrations depend on dynamically generated data, then 
+make sure the only thing that is dynamic is the data itself, not its structure.
 2. Generate migrations with descriptive names & slugs. Slug is required and should explain the changes.
 3. Set human-readable file template for new migrations. We use `*date*_*slug*.py` pattern, e.g. `2022-08-24_post_content_idx.py`
 ```
@@ -959,7 +959,7 @@ async def root():
 If you must use an SDK to interact with external services, and it's not `async`,
 then make the HTTP calls in an external worker thread.
 
-For a fast and simple example, we could use our well-known `run_in_threadpool` from starlette.
+For a simple example, we could use our well-known `run_in_threadpool` from starlette.
 ```python
 from fastapi import FastAPI
 from fastapi.concurrency import run_in_threadpool
