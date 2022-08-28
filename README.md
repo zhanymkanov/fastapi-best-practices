@@ -746,9 +746,130 @@ print(type(p.field_2))
 print(type(p.content))
 # OUTPUT: Article
 ```
-### 19. SQL-first, Pydantic-second, Custom-last
-### 20. Validate url source (if users are able to upload files and send urls)
-Bad users could send strange urls for user facing public objects.
+### 19. SQL-first, Pydantic-second.
+- Usually, database handles data processing much faster and cleaner than CPython will ever do. 
+- It's preferable to do all the complex joins and simple data manipulations with SQL.
+- Nested objects like JSON aggregation should be done in DB.
+- Pydantic should only serialize data from db with minimum extra normalization.
+```python
+# src.posts.service
+from typing import Mapping
+
+from pydantic import UUID4
+from sqlalchemy import desc, func, select, text
+from sqlalchemy.sql.functions import coalesce
+
+from src.database import databse, posts, profiles, post_review, products
+
+async def get_posts(
+    creator_id: UUID4, *, limit: int = 10, offset: int = 0
+) -> list[Mapping]: 
+    select_query = (
+        select(
+            (
+                posts.c.id,
+                posts.c.type,
+                posts.c.slug,
+                posts.c.title,
+                func.json_build_object(
+                   text("'id', profiles.id"),
+                   text("'first_name', profiles.first_name"),
+                   text("'last_name', profiles.last_name"),
+                   text("'username', profiles.username"),
+                ).label("creator"),
+            )
+        )
+        .select_from(posts.join(profiles, posts.c.owner_id == profiles.c.id))
+        .where(posts.c.owner_id == creator_id)
+        .limit(limit)
+        .offset(offset)
+        .group_by(
+            posts.c.id,
+            posts.c.type,
+            posts.c.slug,
+            posts.c.title,
+            profiles.c.id,
+            profiles.c.first_name,
+            profiles.c.last_name,
+            profiles.c.username,
+            profiles.c.avatar,
+        )
+        .order_by(
+            desc(coalesce(posts.c.updated_at, posts.c.published_at, posts.c.created_at))
+        )
+    )
+    
+    return await database.fetch_all(select_query)
+
+# src.posts.schemas
+import orjson
+from enum import Enum
+
+from pydantic import BaseModel, UUID4, validator
+
+
+class PostType(str, Enum):
+    ARTICLE = "ARTICLE"
+    COURSE = "COURSE"
+
+   
+class Creator(BaseModel):
+    id: UUID4
+    first_name: str
+    last_name: str
+    username: str
+
+
+class Post(BaseModel):
+    id: UUID4
+    type: PostType
+    slug: str
+    title: str
+    creator: Creator
+
+    @validator("creator", pre=True)  # before default validation
+    def parse_json(cls, creator: str | dict | Creator) -> dict | Creator:
+       if isinstance(creator, str):  # i.e. json
+          return orjson.loads(creator)
+
+       return creator
+    
+# src.posts.router
+@from fastapi import APIRouter, status
+
+router = APIRouter()
+
+
+@router.get("/creators/{creator_id}/posts", response_model=list[Post])
+async def get_creator_posts(creator: Mapping = Depends(valid_creator_id)):
+   posts = await service.get_posts(creator["id"])
+
+   return posts
+```
+
+If an aggregated data form DB is a simple JSON, then take a look Json field type of Pydantic,
+which will load raw JSON first.
+```python
+from pydantic import BaseModel, Json
+
+class A(BaseModel):
+    numbers: Json[list[int]]
+    dicts: Json[dict[str, int]]
+
+valid_a = A(numbers="[1, 2, 3]", dicts='{"key": 1000}')  # becomes A(numbers=[1,2,3], dicts={"key": 1000})
+invalid_a = A(numbers='["a", "b", "c"]', dicts='{"key": "str instead of int"}')  # raises ValueError
+```
+
+### 20. Validate hosts, if users can send publicly available URLs
+For example, we have a specific endpoint which:
+1. accepts media file from the user,
+2. generates unique url for this file,
+3. returns url to user,
+   1. which they will use in other endpoints like `PUT /profiles/me`, `POST /posts`
+   2. these endpoints accept files only from whitelisted hosts
+4. uploads file to AWS with this name and matching URL.
+
+If we don't whitelist URL hosts, then bad users will have a chance to upload dangerous links.
 ```python
 from pydantic import AnyUrl, BaseModel
 
@@ -756,7 +877,8 @@ ALLOWED_MEDIA_URLS = {"mysite.com", "mysite.org"}
 
 class CompanyMediaUrl(AnyUrl):
     @classmethod
-    def validate_host(cls, parts: dict) -> tuple[str, str | None, str, bool]:
+    def validate_host(cls, parts: dict) -> tuple[str, str, str, bool]:
+       """Extend pydantic's AnyUrl validation to whitelist URL hosts."""
         host, tld, host_type, rebuild = super().validate_host(parts)
         if host not in ALLOWED_MEDIA_URLS:
             raise ValueError(
@@ -766,26 +888,9 @@ class CompanyMediaUrl(AnyUrl):
         return host, tld, host_type, rebuild
 
 
-class Post(BaseModel):
-    thumbnail_url: CompanyMediaUrl
-
-```
-### 21. root_validator to use multiple columns during validation
-```python
-from pydantic import BaseModel, root_validator
-
-
 class Profile(BaseModel):
-    username: str | None
-    first_name: str
-    last_name: str
+    avatar_url: CompanyMediaUrl  # only whitelisted urls for avatar
 
-    @root_validator()
-    def set_username(cls, data: dict) -> dict:
-        if not data.get("username"):
-            data["username"] = f'{data["first_name"]}_{data["last_name"]}'
-        
-        return data
 ```
 ### 22. pre if data need to be pre-handled before validation
 ### 23. you can just raise a ValueError in pydantic schemas, if schemas face http client 
