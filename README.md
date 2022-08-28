@@ -835,7 +835,7 @@ class Post(BaseModel):
        return creator
     
 # src.posts.router
-@from fastapi import APIRouter, status
+@from fastapi import APIRouter, Depends
 
 router = APIRouter()
 
@@ -892,10 +892,38 @@ class Profile(BaseModel):
     avatar_url: CompanyMediaUrl  # only whitelisted urls for avatar
 
 ```
-### 22. pre if data need to be pre-handled before validation
-### 23. you can just raise a ValueError in pydantic schemas, if schemas face http client 
-it wil return a detailed response of the failed fields
-### 24. don't forget that fastapi converts response Model to Dict then to Model then to JSON
+### 21. Raise a ValueError in custom pydantic validators, if schema directly faces the client 
+It wil return a nice detailed response to users.
+```python
+# src.profiles.schemas
+from pydantic import BaseModel, validator
+
+class ProfileCreate(BaseModel):
+    username: str
+    
+    @validator("username")
+    def validate_bad_words(cls, username: str):
+        if username  == "me":
+            raise ValueError("bad username, choose another")
+        
+        return username
+
+
+# src.profiles.routes
+from fastapi import APIRouter
+
+router = APIRouter()
+
+
+@router.post("/profiles")
+async def get_creator_posts(profile_data: ProfileCreate):
+   pass
+```
+**Response Example:**
+
+<img src="images/custom_bad_response.png" width="400" height="auto">
+
+### 22. don't forget that fastapi converts response Model to Dict then to Model then to JSON
 it may lead to bugs like model can parse only raw data (e.g. forced data aggregation for raw data)
-### 25. if must use sdk, but it's not async, use threadpools
-### 26. use linters (black, isort, autoflake)
+### 23. if must use sdk, but it's not async, use threadpools
+### 24. use linters (black, isort, autoflake)
