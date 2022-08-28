@@ -24,14 +24,12 @@ Some of them are worth sharing.
 16. [Typing is important.](https://github.com/zhanymkanov/fastapi-best-practices#16-typing-is-important)
 17. [Save files in chunk.](https://github.com/zhanymkanov/fastapi-best-practices#17-save-files-in-chunk)
 18. [Be careful with dynamic pydantic fields.](https://github.com/zhanymkanov/fastapi-best-practices#18-be-careful-with-dynamic-pydantic-fields)
-19. ~~SQL-first, Pydantic-second, Custom-third~~ 
-20. [Validate url source (if users are able to upload files and send urls).](https://github.com/zhanymkanov/fastapi-best-practices#20-validate-url-source-if-users-are-able-to-upload-files-and-send-urls)
-21. [root_validator to use multiple columns during validation.](https://github.com/zhanymkanov/fastapi-best-practices#21-root_validator-to-use-multiple-columns-during-validation)
-22. ~~pre=True if data need to be pre-handled before validation~~
-23. ~~raise a ValueError in pydantic, if schema faces http client~~
-24. ~~remember fastapi response modeling~~
-25. if must use sdk, but it's not async, use threadpools.
-26. ~~use linters~~
+19. [SQL-first, Pydantic-second.](https://github.com/zhanymkanov/fastapi-best-practices#19-sql-first-pydantic-second) 
+20. [Validate hosts, if users can send publicly available URLs.](https://github.com/zhanymkanov/fastapi-best-practices#20-validate-hosts-if-users-can-send-publicly-available-urls)
+21. [Raise a ValueError in custom pydantic validators, if schema directly faces the client.](https://github.com/zhanymkanov/fastapi-best-practices#21-raise-a-valueerror-in-custom-pydantic-validators-if-schema-directly-faces-the-client)
+22. [Don't forget FastAPI converts Response Pydantic Object](https://github.com/zhanymkanov/fastapi-best-practices#22-dont-forget-fastapi-converts-response-pydantic-object-to-dict-then-to-an-instance-of-responsemodel-then-to-dict-then-to-json)
+23. [If you must use sync SDK, then run it in a thread pool.](https://github.com/zhanymkanov/fastapi-best-practices#23-if-you-must-use-sync-sdk-then-run-it-in-a-thread-pool)
+24. [Use linters (black, isort, autoflake)](https://github.com/zhanymkanov/fastapi-best-practices#24-use-linters-black-isort-autoflake)
 
 ### 1. Project Structure. Consistent & predictable
 There are many ways to structure the project, but the best structure is a structure that is consistent, straightforward and has no surprises.
@@ -746,7 +744,7 @@ print(type(p.field_2))
 print(type(p.content))
 # OUTPUT: Article
 ```
-### 19. SQL-first, Pydantic-second.
+### 19. SQL-first, Pydantic-second
 - Usually, database handles data processing much faster and cleaner than CPython will ever do. 
 - It's preferable to do all the complex joins and simple data manipulations with SQL.
 - Nested objects like JSON aggregation should be done in DB.
