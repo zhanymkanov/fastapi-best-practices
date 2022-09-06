@@ -670,37 +670,22 @@ print(type(post.content))
 class Post(BaseModel):
    content: Video | Article
 ```
-2. Validate input has only valid fields 
+2. Validate input has only valid fields : using [`Extra` Model Configuration](https://pydantic-docs.helpmanual.io/usage/model_config/), choose any of :
+- allow (allow any fields apart from the ones listed)
+- ignore (filter out any fields apart from the ones listed)
+- forbid (raise errors if any fields are present apart from the ones listed)
 ```python
-from pydantic import BaseModel, root_validator
+from pydantic import BaseModel, Extra
 
-class Article(BaseModel):
+class Article(BaseModel, extra=Extra.forbid):
    text: str | None
    extra: str | None
-   
-   @root_validator(pre=True)  # validate all values before pydantic
-   def has_only_article_fields(cls, data: dict):
-      """Silly and ugly solution to validate data has only article fields."""
-      fields = set(data.keys())
-      if fields != {"text", "extra"}:
-         raise ValueError("invalid fields")
-
-      return data
        
 
-class Video(BaseModel):
+class Video(BaseModel, extra=Extra.forbid):
    video_id: int
    text: str | None
    extra: str | None
-   
-   @root_validator(pre=True)
-   def has_only_video_fields(cls, data: dict):
-      """Silly and ugly solution to validate data has only video fields."""
-      fields = set(data.keys())
-      if fields != {"text", "extra", "video_id"}:
-         raise ValueError("invalid fields")
-
-      return data
 
    
 class Post(BaseModel):
