@@ -664,13 +664,8 @@ print(type(post.content))
 # OUTPUT: Article
 # Article is very inclusive and all fields are optional, allowing any dict to become valid
 ```
-**Not Terrible Solutions:**
-1. Order field types properly: from the most strict ones to loose ones.
-```python
-class Post(BaseModel):
-   content: Video | Article
-```
-2. Validate input has only valid fields 
+**Solutions:**
+1. Validate input has only valid fields 
 ```python
 from pydantic import BaseModel, root_validator
 
@@ -678,14 +673,8 @@ class Article(BaseModel):
    text: str | None
    extra: str | None
    
-   @root_validator(pre=True)  # validate all values before pydantic
-   def has_only_article_fields(cls, data: dict):
-      """Silly and ugly solution to validate data has only article fields."""
-      fields = set(data.keys())
-      if fields != {"text", "extra"}:
-         raise ValueError("invalid fields")
-
-      return data
+   class Config:
+        extra = 'forbid'
        
 
 class Video(BaseModel):
@@ -693,20 +682,14 @@ class Video(BaseModel):
    text: str | None
    extra: str | None
    
-   @root_validator(pre=True)
-   def has_only_video_fields(cls, data: dict):
-      """Silly and ugly solution to validate data has only video fields."""
-      fields = set(data.keys())
-      if fields != {"text", "extra", "video_id"}:
-         raise ValueError("invalid fields")
-
-      return data
+   class Config:
+        extra = 'forbid'
 
    
 class Post(BaseModel):
    content: Article | Video
 ```
-3. Use Pydantic's Smart Union (>v1.9) if fields are simple
+2. Use Pydantic's Smart Union (>v1.9) if fields are simple
 
 It's a good solution if the fields are simple like `int` or `bool`, 
 but it doesn't work for complex fields like classes.
