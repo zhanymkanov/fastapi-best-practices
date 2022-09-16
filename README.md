@@ -31,7 +31,8 @@ Some of them are worth sharing.
 22. [Don't forget FastAPI converts Response Pydantic Object...](https://github.com/zhanymkanov/fastapi-best-practices#22-dont-forget-fastapi-converts-response-pydantic-object-to-dict-then-to-an-instance-of-responsemodel-then-to-dict-then-to-json)
 23. [If you must use sync SDK, then run it in a thread pool.](https://github.com/zhanymkanov/fastapi-best-practices#23-if-you-must-use-sync-sdk-then-run-it-in-a-thread-pool)
 24. [Use linters (black, isort, autoflake).](https://github.com/zhanymkanov/fastapi-best-practices#24-use-linters-black-isort-autoflake)
-25. [Bonus Section.](https://github.com/zhanymkanov/fastapi-best-practices#bonus-section)
+25. [Pydantic Schema Partial Update.](https://github.com/zhanymkanov/fastapi-best-practices#25-pydantic-schema-partial-update)
+26. [Bonus Section.](https://github.com/zhanymkanov/fastapi-best-practices#bonus-section)
 
 ### 1. Project Structure. Consistent & predictable
 There are many ways to structure the project, but the best structure is a structure that is consistent, straightforward, and has no surprises.
@@ -989,6 +990,56 @@ set -x
 autoflake --remove-all-unused-imports --recursive --remove-unused-variables --in-place src tests --exclude=__init__.py
 isort src tests --profile black
 black src tests
+```
+### 25. Pydantic Schema Partial Update
+This class has the function of changing all member variables of the class to Optional when declared as metaclass.
+
+If you inherit the class made of the pydantic Base Model and declare `metaclass=AllOptional` there.
+```python
+from fastapi import FastAPI
+from pydantic import BaseModel
+from pydantic.main import ModelMetaclass
+from typing import Optional
+
+
+app = FastAPI()
+
+
+class AllOptional(ModelMetaclass):
+    def __new__(self, name, bases, namespaces, **kwargs):
+        annotations = namespaces.get('__annotations__', {})
+        for base in bases:
+            annotations.update(base.__annotations__)
+        for field in annotations:
+            if not field.startswith('__'):
+                annotations[field] = Optional[annotations[field]]
+        namespaces['__annotations__'] = annotations
+        return super().__new__(self, name, bases, namespaces, **kwargs)
+
+
+class UserSchema(BaseModel):
+    first_name: str
+    last_name: str
+    age: int
+
+
+class UserUpdateSchema(UserSchema, metaclass=AllOptional):
+    pass
+
+
+@app.post("/")
+async def create(user: UserSchema):
+   # Create New User
+   ...
+
+
+@app.patch("/{user_id}/")
+async def partial_update(
+   user_id: int,
+   user_updates: UserUpdateSchema,
+):
+    # Update User
+    ...
 ```
 ### Bonus Section
 Some very kind people shared their own experience and best practices that are definitely worth reading.
