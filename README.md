@@ -731,6 +731,16 @@ print(type(p.field_2))
 print(type(p.content))
 # OUTPUT: Article, because smart_union doesn't work for complex fields like classes
 ```
+
+**Fast Workaround:**
+
+Order field types properly: from the most strict ones to loose ones.
+
+```python
+class Post(BaseModel):
+   content: Video | Article
+```
+
 ### 19. SQL-first, Pydantic-second
 - Usually, database handles data processing much faster and cleaner than CPython will ever do. 
 - It's preferable to do all the complex joins and simple data manipulations with SQL.
