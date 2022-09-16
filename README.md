@@ -667,14 +667,14 @@ print(type(post.content))
 **Solutions:**
 1. Validate input has only valid fields 
 ```python
-from pydantic import BaseModel, root_validator
+from pydantic import BaseModel, Extra, root_validator
 
 class Article(BaseModel):
    text: str | None
    extra: str | None
    
    class Config:
-        extra = 'forbid'
+        extra = Extra.forbid
        
 
 class Video(BaseModel):
@@ -683,7 +683,7 @@ class Video(BaseModel):
    extra: str | None
    
    class Config:
-        extra = 'forbid'
+        extra = Extra.forbid
 
    
 class Post(BaseModel):
