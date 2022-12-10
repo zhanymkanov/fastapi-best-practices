@@ -49,31 +49,31 @@ fastapi-project
 ├── alembic/
 ├── src
 │   ├── auth
-│   │   ├── router.py
-│   │   ├── schemas.py  # pydantic models
-│   │   ├── models.py  # db models
-│   │   ├── dependencies.py
-│   │   ├── config.py  # local configs
-│   │   ├── constants.py
-│   │   ├── exceptions.py
-│   │   ├── service.py
-│   │   └── utils.py
+│   │   ├── auth_router.py
+│   │   ├── auth_schemas.py  # pydantic models
+│   │   ├── auth_models.py  # db models
+│   │   ├── auth_dependencies.py
+│   │   ├── auth_config.py  # local configs
+│   │   ├── auth_constants.py
+│   │   ├── auth_exceptions.py
+│   │   ├── auth_service.py
+│   │   └── auth_utils.py
 │   ├── aws
-│   │   ├── client.py  # client model for external service communication
-│   │   ├── schemas.py
-│   │   ├── config.py
-│   │   ├── constants.py
-│   │   ├── exceptions.py
-│   │   └── utils.py
+│   │   ├── aws_client.py  # client model for external service communication
+│   │   ├── aws_schemas.py
+│   │   ├── aws_config.py
+│   │   ├── aws_constants.py
+│   │   ├── aws_exceptions.py
+│   │   └── aws_utils.py
 │   └── posts
-│   │   ├── router.py
-│   │   ├── schemas.py
-│   │   ├── models.py
-│   │   ├── dependencies.py
-│   │   ├── constants.py
-│   │   ├── exceptions.py
-│   │   ├── service.py
-│   │   └── utils.py
+│   │   ├── posts_router.py
+│   │   ├── posts_schemas.py
+│   │   ├── posts_models.py
+│   │   ├── posts_dependencies.py
+│   │   ├── posts_constants.py
+│   │   ├── posts_exceptions.py
+│   │   ├── posts_service.py
+│   │   └── posts_utils.py
 │   ├── config.py  # global configs
 │   ├── models.py  # global models
 │   ├── exceptions.py  # global exceptions
