@@ -5,6 +5,7 @@ For the last 1.5 years in production,
 we have been making good and bad decisions that impacted our developer experience dramatically.
 Some of them are worth sharing. 
 
+Project [sample](https://github.com/zhanymkanov/fastapi_production_template) built with this best-practices in mind.
 
 ### Contents
 1. [Project Structure. Consistent & predictable.](https://github.com/zhanymkanov/fastapi-best-practices#1-project-structure-consistent--predictable)
