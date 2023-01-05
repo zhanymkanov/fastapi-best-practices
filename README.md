@@ -5,8 +5,6 @@ For the last 1.5 years in production,
 we have been making good and bad decisions that impacted our developer experience dramatically.
 Some of them are worth sharing. 
 
-Project [sample](https://github.com/zhanymkanov/fastapi_production_template) built with this best-practices in mind.
-
 ### Contents
 1. [Project Structure. Consistent & predictable.](https://github.com/zhanymkanov/fastapi-best-practices#1-project-structure-consistent--predictable)
 2. [Excessively use Pydantic for data validation.](https://github.com/zhanymkanov/fastapi-best-practices#2-excessively-use-pydantic-for-data-validation)
@@ -33,6 +31,7 @@ Project [sample](https://github.com/zhanymkanov/fastapi_production_template) bui
 23. [If you must use sync SDK, then run it in a thread pool.](https://github.com/zhanymkanov/fastapi-best-practices#23-if-you-must-use-sync-sdk-then-run-it-in-a-thread-pool)
 24. [Use linters (black, isort, autoflake).](https://github.com/zhanymkanov/fastapi-best-practices#24-use-linters-black-isort-autoflake)
 25. [Bonus Section.](https://github.com/zhanymkanov/fastapi-best-practices#bonus-section)
+<p style="text-align: center;"> <i>Project <a href="https://github.com/zhanymkanov/fastapi_production_template">sample</a> built with these best-practices in mind. </i> </p>
 
 ### 1. Project Structure. Consistent & predictable
 There are many ways to structure the project, but the best structure is a structure that is consistent, straightforward, and has no surprises.
@@ -141,7 +140,7 @@ class UserBase(BaseModel):
 
 ```
 ### 3. Use dependencies for data validation vs DB
-Pydantic can only validate the values of client input. 
+Pydantic can only validate the values from client input. 
 Use dependencies to validate data against database constraints like email already exists, user not found, etc. 
 ```python3
 # dependencies.py
@@ -214,7 +213,6 @@ async def valid_owned_post(
 # router.py
 @router.get("/users/{user_id}/posts/{post_id}", response_model=PostResponse)
 async def get_user_post(post: Mapping = Depends(valid_owned_post)):
-    """Get post that belong the user."""
     return post
 
 ```
@@ -328,12 +326,12 @@ async def get_user_profile_by_id(profile: Mapping = Depends(valid_profile_id)):
 async def get_user_profile_by_id(
      creator_profile: Mapping = Depends(valid_creator_id)
 ):
-    """Get profile by id."""
+    """Get creator's profile by id."""
     return creator_profile
 
 ```
 
-Use /me endpoints for users own resources (e.g. `GET /profiles/me`, `GET /users/me/posts`)
+Use /me endpoints for users resources (e.g. `GET /profiles/me`, `GET /users/me/posts`)
    1. No need to validate that user id exists - it's already checked via auth method
    2. No need to check whether the user id belongs to the requester
 
@@ -367,8 +365,8 @@ def good_ping():
 
 @router.get("/perfect-ping")
 async def perfect_ping():
-    await asyncio.sleep(10) # non I/O blocking operation
-    pong = await service.async_get_pong()  # non I/O blocking db call
+    await asyncio.sleep(10) # non-blocking I/O operation
+    pong = await service.async_get_pong()  # non-blocking I/O db call
 
     return {"pong": pong}
 
@@ -390,6 +388,7 @@ async def perfect_ping():
    3. While `good_ping` is being executed, event loop selects next tasks from the queue and works on them (e.g. accept new request, call db)
       - Independently of main thread (i.e. our FastAPI app), 
         worker thread will be waiting for `time.sleep` to finish and then for `service.get_pong` to finish
+      - Sync operation blocks only the side thread, not the main one.
    4. When `good_ping` finishes its work, server returns a response to the client
 3. `GET /perfect-ping`
    1. FastAPI server receives a request and starts handling it
@@ -399,7 +398,7 @@ async def perfect_ping():
    5. Event loop selects next tasks from the queue and works on them (e.g. accept new request, call db)
    6. When `service.async_get_pong` is done, server returns a response to the client
 
-The second caveat is that operations that are non-blocking awaitables or are sent to thread pool must be I/O intensive tasks (e.g. open file, db call, external API call).
+The second caveat is that operations that are non-blocking awaitables or are sent to the thread pool must be I/O intensive tasks (e.g. open file, db call, external API call).
 - Awaiting CPU-intensive tasks (e.g. heavy calculations, data processing, video transcoding) is worthless since the CPU has to work to finish the tasks, 
 while I/O operations are external and server does nothing while waiting for that operations to finish, thus it can go to the next tasks.
 - Running CPU-intensive tasks in other threads also isn't effective, because of [GIL](https://realpython.com/python-gil/). 
@@ -596,7 +595,7 @@ async def test_create_post(client: TestClient):
 Unless you have sync db connections (excuse me?) or aren't planning to write integration tests.
 ### 15. BackgroundTasks > asyncio.create_task
 BackgroundTasks can [effectively run](https://github.com/encode/starlette/blob/31164e346b9bd1ce17d968e1301c3bb2c23bb418/starlette/background.py#L25)
-both blocking and non-blocking I/O operations the same way it handles routes (`sync` functions are run in a threadpool, while `async` ones are awaited later)
+both blocking and non-blocking I/O operations the same way FastAPI handles blocking routes (`sync` tasks are run in a threadpool, while `async` tasks are awaited later)
 - Don't lie to the worker and don't mark blocking I/O operations as `async`
 - Don't use it for heavy CPU intensive tasks.
 ```python
@@ -666,9 +665,9 @@ print(type(post.content))
 # Article is very inclusive and all fields are optional, allowing any dict to become valid
 ```
 **Solutions:**
-1. Validate input has only valid fields 
+1. Validate input has only allowed valid fields and raise error if unknowns are provided
 ```python
-from pydantic import BaseModel, Extra, root_validator
+from pydantic import BaseModel, Extra
 
 class Article(BaseModel):
    text: str | None
@@ -733,7 +732,7 @@ print(type(p.content))
 # OUTPUT: Article, because smart_union doesn't work for complex fields like classes
 ```
 
-**Fast Workaround:**
+3. Fast Workaround
 
 Order field types properly: from the most strict ones to loose ones.
 
@@ -950,7 +949,7 @@ async def root():
 [INFO] [2022-08-28 12:00:00.000030] called dict
 ```
 ### 23. If you must use sync SDK, then run it in a thread pool.
-If you must use an SDK to interact with external services, and it's not `async`,
+If you must use a library to interact with external services, and it's not `async`,
 then make the HTTP calls in an external worker thread.
 
 For a simple example, we could use our well-known `run_in_threadpool` from starlette.
