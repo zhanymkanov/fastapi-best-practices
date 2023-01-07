@@ -22,7 +22,7 @@ Some of them are worth sharing.
 14. [Set tests client async from day 0.](https://github.com/zhanymkanov/fastapi-best-practices#14-set-tests-client-async-from-day-0)
 15. [BackgroundTasks > asyncio.create_task.](https://github.com/zhanymkanov/fastapi-best-practices#15-backgroundtasks--asynciocreate_task)
 16. [Typing is important.](https://github.com/zhanymkanov/fastapi-best-practices#16-typing-is-important)
-17. [Save files in chunk.](https://github.com/zhanymkanov/fastapi-best-practices#17-save-files-in-chunk)
+17. [Save files in chunks.](https://github.com/zhanymkanov/fastapi-best-practices#17-save-files-in-chunks)
 18. [Be careful with dynamic pydantic fields.](https://github.com/zhanymkanov/fastapi-best-practices#18-be-careful-with-dynamic-pydantic-fields)
 19. [SQL-first, Pydantic-second.](https://github.com/zhanymkanov/fastapi-best-practices#19-sql-first-pydantic-second) 
 20. [Validate hosts, if users can send publicly available URLs.](https://github.com/zhanymkanov/fastapi-best-practices#20-validate-hosts-if-users-can-send-publicly-available-urls)
