@@ -887,7 +887,7 @@ class Profile(BaseModel):
 
 ```
 ### 21. Raise a ValueError in custom pydantic validators, if schema directly faces the client 
-It wil return a nice detailed response to users.
+It will return a nice detailed response to users.
 ```python
 # src.profiles.schemas
 from pydantic import BaseModel, validator
