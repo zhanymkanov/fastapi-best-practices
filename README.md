@@ -753,7 +753,7 @@ from pydantic import UUID4
 from sqlalchemy import desc, func, select, text
 from sqlalchemy.sql.functions import coalesce
 
-from src.database import databse, posts, profiles, post_review, products
+from src.database import database, posts, profiles, post_review, products
 
 async def get_posts(
     creator_id: UUID4, *, limit: int = 10, offset: int = 0
