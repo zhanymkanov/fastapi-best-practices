@@ -107,7 +107,7 @@ fastapi-project
    6. `constants.py` - module specific constants and error codes
    7. `config.py` - e.g. env vars
    8. `utils.py` - non-business logic functions, e.g. response normalization, data enrichment, etc.
-   9. `exceptions` - module specific exceptions, e.g. `PostNotFound`, `InvalidUserData`
+   9. `exceptions.py` - module specific exceptions, e.g. `PostNotFound`, `InvalidUserData`
 3. When package requires services or dependencies or constants from other packages - import them with an explicit module name
 ```python
 from src.auth import constants as auth_constants
@@ -439,7 +439,7 @@ class ORJSONModel(BaseModel):
     class Config:
         json_loads = orjson.loads
         json_dumps = orjson_dumps
-        json_encoders = {datetime: convert_datetime_to_gmt}  # method for customer JSON encoding of datetime fields
+        json_encoders = {datetime: convert_datetime_to_gmt}  # method for custom JSON encoding of datetime fields
 
     @root_validator()
     def set_null_microseconds(cls, data: dict) -> dict:
