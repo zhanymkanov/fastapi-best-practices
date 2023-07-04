@@ -302,7 +302,7 @@ also checks if the profile is creator, then it's better to rename `creator_id` p
 ```python3
 # src.profiles.dependencies
 async def valid_profile_id(profile_id: UUID4) -> Mapping:
-    profile = await service.get_by_id(post_id)
+    profile = await service.get_by_id(profile_id)
     if not profile:
         raise ProfileNotFound()
 
