@@ -27,7 +27,7 @@ Some of them are worth sharing.
 19. [SQL-first, Pydantic-second.](https://github.com/zhanymkanov/fastapi-best-practices#19-sql-first-pydantic-second) 
 20. [Validate hosts, if users can send publicly available URLs.](https://github.com/zhanymkanov/fastapi-best-practices#20-validate-hosts-if-users-can-send-publicly-available-urls)
 21. [Raise a ValueError in custom pydantic validators, if schema directly faces the client.](https://github.com/zhanymkanov/fastapi-best-practices#21-raise-a-valueerror-in-custom-pydantic-validators-if-schema-directly-faces-the-client)
-22. [Don't forget FastAPI converts Response Pydantic Object...](https://github.com/zhanymkanov/fastapi-best-practices#22-dont-forget-fastapi-converts-response-pydantic-object-to-dict-then-to-an-instance-of-responsemodel-then-to-dict-then-to-json)
+22. [FastAPI converts Pydantic objects to dict, then to Pydantic object, then to JSON](https://github.com/zhanymkanov/fastapi-best-practices#22-fast-api-converts-pydantic-objects-to-dict-then-to-pydantic-object-then-to-json)
 23. [If you must use sync SDK, then run it in a thread pool.](https://github.com/zhanymkanov/fastapi-best-practices#23-if-you-must-use-sync-sdk-then-run-it-in-a-thread-pool)
 24. [Use linters (black, isort, autoflake).](https://github.com/zhanymkanov/fastapi-best-practices#24-use-linters-black-isort-autoflake)
 25. [Bonus Section.](https://github.com/zhanymkanov/fastapi-best-practices#bonus-section)
@@ -914,7 +914,12 @@ async def get_creator_posts(profile_data: ProfileCreate):
 
 <img src="images/custom_bad_response.png" width="400" height="auto">
 
-### 22. Don't forget FastAPI converts Response Pydantic Object to Dict then to an instance of ResponseModel then to Dict then to JSON
+### 22. FastAPI converts Pydantic objects to dict, then to Pydantic object, then to JSON
+If you think you can return Pydantic object that matches your route's `response_model` to make some optimizations,
+then it's wrong. 
+
+FastAPI firstly converts that pydantic object to dict with its `jsonable_encoder`, then validates 
+data with your `response_model`, and only then serializes your object to JSON. 
 ```python
 from fastapi import FastAPI
 from pydantic import BaseModel, root_validator
