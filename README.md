@@ -22,7 +22,7 @@ Some of them are worth sharing.
 14. [Set tests client async from day 0.](https://github.com/zhanymkanov/fastapi-best-practices#14-set-tests-client-async-from-day-0)
 15. [BackgroundTasks > asyncio.create_task.](https://github.com/zhanymkanov/fastapi-best-practices#15-backgroundtasks--asynciocreate_task)
 16. [Typing is important.](https://github.com/zhanymkanov/fastapi-best-practices#16-typing-is-important)
-17. [Save files in chunk.](https://github.com/zhanymkanov/fastapi-best-practices#17-save-files-in-chunk)
+17. [Save files in chunks.](https://github.com/zhanymkanov/fastapi-best-practices#17-save-files-in-chunks)
 18. [Be careful with dynamic pydantic fields.](https://github.com/zhanymkanov/fastapi-best-practices#18-be-careful-with-dynamic-pydantic-fields)
 19. [SQL-first, Pydantic-second.](https://github.com/zhanymkanov/fastapi-best-practices#19-sql-first-pydantic-second) 
 20. [Validate hosts, if users can send publicly available URLs.](https://github.com/zhanymkanov/fastapi-best-practices#20-validate-hosts-if-users-can-send-publicly-available-urls)
@@ -107,7 +107,7 @@ fastapi-project
    6. `constants.py` - module specific constants and error codes
    7. `config.py` - e.g. env vars
    8. `utils.py` - non-business logic functions, e.g. response normalization, data enrichment, etc.
-   9. `exceptions` - module specific exceptions, e.g. `PostNotFound`, `InvalidUserData`
+   9. `exceptions.py` - module specific exceptions, e.g. `PostNotFound`, `InvalidUserData`
 3. When package requires services or dependencies or constants from other packages - import them with an explicit module name
 ```python
 from src.auth import constants as auth_constants
@@ -302,7 +302,7 @@ also checks if the profile is creator, then it's better to rename `creator_id` p
 ```python3
 # src.profiles.dependencies
 async def valid_profile_id(profile_id: UUID4) -> Mapping:
-    profile = await service.get_by_id(post_id)
+    profile = await service.get_by_id(profile_id)
     if not profile:
         raise ProfileNotFound()
 
@@ -750,7 +750,7 @@ from pydantic import UUID4
 from sqlalchemy import desc, func, select, text
 from sqlalchemy.sql.functions import coalesce
 
-from src.database import databse, posts, profiles, post_review, products
+from src.database import database, posts, profiles, post_review, products
 
 async def get_posts(
     creator_id: UUID4, *, limit: int = 10, offset: int = 0
@@ -884,7 +884,7 @@ class Profile(BaseModel):
 
 ```
 ### 21. Raise a ValueError in custom pydantic validators, if schema directly faces the client 
-It wil return a nice detailed response to users.
+It will return a nice detailed response to users.
 ```python
 # src.profiles.schemas
 from pydantic import BaseModel, validator
