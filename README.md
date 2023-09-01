@@ -514,7 +514,8 @@ Will generate docs like this:
 ### 10. Use Pydantic's BaseSettings for configs
 Pydantic gives a [powerful tool](https://pydantic-docs.helpmanual.io/usage/settings/) to parse environment variables and process them with its validators. 
 ```python
-from pydantic import AnyUrl, BaseSettings, PostgresDsn
+from pydantic import AnyUrl, PostgresDsn
+from pydantic_settings import BaseSettings  # pydantic v2
 
 class AppSettings(BaseSettings):
     class Config:
@@ -634,7 +635,7 @@ async def save_video(video_file: UploadFile):
      while chunk := await video_file.read(DEFAULT_CHUNK_SIZE):
          await f.write(chunk)
 ```
-### 18. Be careful with dynamic pydantic fields
+### 18. Be careful with dynamic pydantic fields (Pydantic v1)
 If you have a pydantic field that can accept a union of types, be sure the validator explicitly knows the difference between those types.
 ```python
 from pydantic import BaseModel
@@ -685,7 +686,7 @@ class Video(BaseModel):
 class Post(BaseModel):
    content: Article | Video
 ```
-2. Use Pydantic's Smart Union (>v1.9) if fields are simple
+2. Use Pydantic's Smart Union (>v1.9, <2.0) if fields are simple
 
 It's a good solution if the fields are simple like `int` or `bool`, 
 but it doesn't work for complex fields like classes.
@@ -867,7 +868,7 @@ ALLOWED_MEDIA_URLS = {"mysite.com", "mysite.org"}
 
 class CompanyMediaUrl(AnyUrl):
     @classmethod
-    def validate_host(cls, parts: dict) -> tuple[str, str, str, bool]:
+    def validate_host(cls, parts: dict) -> tuple[str, str, str, bool]:  # pydantic v1
        """Extend pydantic's AnyUrl validation to whitelist URL hosts."""
         host, tld, host_type, rebuild = super().validate_host(parts)
         if host not in ALLOWED_MEDIA_URLS:
@@ -891,7 +892,7 @@ from pydantic import BaseModel, validator
 class ProfileCreate(BaseModel):
     username: str
     
-    @validator("username")
+    @validator("username")  # pydantic v1
     def validate_bad_words(cls, username: str):
         if username  == "me":
             raise ValueError("bad username, choose another")
@@ -964,19 +965,18 @@ async def call_my_sync_library():
     client = SyncAPIClient()
     await run_in_threadpool(client.make_request, data=my_data)
 ```
-### 24. Use linters (black, isort, autoflake)
+### 24. Use linters (black, ruff)
 With linters, you can forget about formatting the code and focus on writing the business logic.
 
 Black is the uncompromising code formatter that eliminates so many small decisions you have to make during development.
-Other linters help you write cleaner code and follow the PEP8.
+Ruff is "blazingly-fast" new linter that replaces autoflake and isort, and supports more than 600 lint rules.
 
 It's a popular good practice to use pre-commit hooks, but just using the script was ok for us.
 ```shell
 #!/bin/sh -e
 set -x
 
-autoflake --remove-all-unused-imports --recursive --remove-unused-variables --in-place src tests --exclude=__init__.py
-isort src tests --profile black
+ruff --fix
 black src tests
 ```
 ### Bonus Section
