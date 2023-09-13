@@ -455,7 +455,6 @@ class CustomModel(BaseModel):
 
 ```
 In the example above we have decided to make a global base model which: 
-- uses [orjson](https://github.com/ijl/orjson) to serialize data
 - drops microseconds to 0 in all date formats
 - serializes all datetime fields to standard format with explicit timezone 
 ### 9. Docs
