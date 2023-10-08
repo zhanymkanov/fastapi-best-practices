@@ -29,7 +29,7 @@ Some of them are worth sharing.
 21. [Raise a ValueError in custom pydantic validators, if schema directly faces the client.](https://github.com/zhanymkanov/fastapi-best-practices#21-raise-a-valueerror-in-custom-pydantic-validators-if-schema-directly-faces-the-client)
 22. [FastAPI converts Pydantic objects to dict, then to Pydantic object, then to JSON](https://github.com/zhanymkanov/fastapi-best-practices#22-fastapi-converts-pydantic-objects-to-dict-then-to-pydantic-object-then-to-json)
 23. [If you must use sync SDK, then run it in a thread pool.](https://github.com/zhanymkanov/fastapi-best-practices#23-if-you-must-use-sync-sdk-then-run-it-in-a-thread-pool)
-24. [Use linters (black, isort, autoflake).](https://github.com/zhanymkanov/fastapi-best-practices#24-use-linters-black-isort-autoflake)
+24. [Use linters (black, ruff).](https://github.com/zhanymkanov/fastapi-best-practices#24-use-linters-black-ruff)
 25. [Bonus Section.](https://github.com/zhanymkanov/fastapi-best-practices#bonus-section)
 <p style="text-align: center;"> <i>Project <a href="https://github.com/zhanymkanov/fastapi_production_template">sample</a> built with these best-practices in mind. </i> </p>
 
