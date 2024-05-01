@@ -132,7 +132,7 @@ class MusicBand(str, Enum):
 
 class UserBase(BaseModel):
     first_name: str = Field(min_length=1, max_length=128)
-    username: constr(regex="^[A-Za-z0-9-_]+$", to_lower=True, strip_whitespace=True)
+    username: constr(pattern="^[A-Za-z0-9-_]+$", to_lower=True, strip_whitespace=True)
     email: EmailStr
     age: int = Field(ge=18, default=None)  # must be greater or equal to 18
     favorite_band: MusicBand = None  # only "AEROSMITH", "QUEEN", "AC/DC" values are allowed to be inputted
