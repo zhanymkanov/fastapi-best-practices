@@ -837,7 +837,7 @@ async def get_creator_posts(creator: Mapping = Depends(valid_creator_id)):
    return posts
 ```
 
-If an aggregated data form DB is a simple JSON, then take a look at Pydantic's `Json` field type,
+If aggregated data from the DB is a simple JSON, then take a look at Pydantic's `Json` field type,
 which will load raw JSON first.
 ```python
 from pydantic import BaseModel, Json
