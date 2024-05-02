@@ -527,8 +527,10 @@ class AppSettings(BaseSettings):
     ALLOWED_CORS_ORIGINS: set[AnyUrl]
 ```
 ### 11. SQLAlchemy: Set DB keys naming convention
-Explicitly setting the indexes' namings according to your database's convention is preferable over sqlalchemy's. 
+Explicitly setting the indexes' namings according to your database's convention is preferable over sqlalchemy's. For more details, see the [official docs](https://alembic.sqlalchemy.org/en/latest/naming.html#integration-of-naming-conventions-into-operations-autogenerate).
 ```python
+# in your models.py:
+
 from sqlalchemy import MetaData
 
 POSTGRES_INDEXES_NAMING_CONVENTION = {
@@ -538,7 +540,18 @@ POSTGRES_INDEXES_NAMING_CONVENTION = {
     "fk": "%(table_name)s_%(column_0_name)s_fkey",
     "pk": "%(table_name)s_pkey",
 }
-metadata = MetaData(naming_convention=POSTGRES_INDEXES_NAMING_CONVENTION)
+
+class Base(DeclarativeBase):
+    metadata = MetaData(naming_convention=POSTGRES_INDEXES_NAMING_CONVENTION)
+```
+
+```python
+# in your Alembic env.py:
+
+# add your model's MetaData object here
+# for 'autogenerate' support
+from myapp import Base
+target_metadata = Base.metadata
 ```
 ### 12. Migrations. Alembic.
 1. Migrations must be static and revertable.
