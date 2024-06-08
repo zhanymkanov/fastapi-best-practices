@@ -21,9 +21,9 @@ Some of them are worth sharing.
   - [Prefer `async` dependencies](#prefer-async-dependencies)
 - [Miscellaneous](#miscellaneous)
   - [Follow the REST](#follow-the-rest)
-  - [ValueErrors might become Pydantic ValidationError](#valueerrors-might-become-pydantic-validationerror)
-  - [If you must use sync SDK, then run it in a thread pool.](#if-you-must-use-sync-sdk-then-run-it-in-a-thread-pool)
   - [FastAPI response serialization](#fastapi-response-serialization)
+  - [If you must use sync SDK, then run it in a thread pool.](#if-you-must-use-sync-sdk-then-run-it-in-a-thread-pool)
+  - [ValueErrors might become Pydantic ValidationError](#valueerrors-might-become-pydantic-validationerror)
   - [Docs](#docs)
   - [Set DB keys naming conventions](#set-db-keys-naming-conventions)
   - [Migrations. Alembic](#migrations-alembic)
@@ -507,6 +507,57 @@ async def get_user_profile_by_id(
     return creator_profile
 
 ```
+### FastAPI response serialization
+If you think you can return Pydantic object that matches your route's `response_model` to make some optimizations,
+then it's wrong. 
+
+FastAPI firstly converts that pydantic object to dict with its `jsonable_encoder`, then validates 
+data with your `response_model`, and only then serializes your object to JSON. 
+```python
+from fastapi import FastAPI
+from pydantic import BaseModel, root_validator
+
+app = FastAPI()
+
+
+class ProfileResponse(BaseModel):
+    @model_validator(mode="after")
+    def debug_usage(self):
+        print("created pydantic model")
+
+        return self
+
+
+@app.get("/", response_model=ProfileResponse)
+async def root():
+    return ProfileResponse()
+```
+**Logs Output:**
+```
+[INFO] [2022-08-28 12:00:00.000000] created pydantic model
+[INFO] [2022-08-28 12:00:00.000020] created pydantic model
+```
+
+### If you must use sync SDK, then run it in a thread pool.
+If you must use a library to interact with external services, and it's not `async`,
+then make the HTTP calls in an external worker thread.
+
+We can use the well-known `run_in_threadpool` from starlette.
+```python
+from fastapi import FastAPI
+from fastapi.concurrency import run_in_threadpool
+from my_sync_library import SyncAPIClient 
+
+app = FastAPI()
+
+
+@app.get("/")
+async def call_my_sync_library():
+    my_data = await service.get_my_data()
+
+    client = SyncAPIClient()
+    await run_in_threadpool(client.make_request, data=my_data)
+```
 
 ### ValueErrors might become Pydantic ValidationError
 If you raise a `ValueError` in a Pydantic schema that is directly faced by the client, it will return a nice detailed response to users.
@@ -545,58 +596,6 @@ async def get_creator_posts(profile_data: ProfileCreate):
 **Response Example:**
 
 <img src="images/value_error_response.png" width="400" height="auto">
-
-### If you must use sync SDK, then run it in a thread pool.
-If you must use a library to interact with external services, and it's not `async`,
-then make the HTTP calls in an external worker thread.
-
-We can use the well-known `run_in_threadpool` from starlette.
-```python
-from fastapi import FastAPI
-from fastapi.concurrency import run_in_threadpool
-from my_sync_library import SyncAPIClient 
-
-app = FastAPI()
-
-
-@app.get("/")
-async def call_my_sync_library():
-    my_data = await service.get_my_data()
-
-    client = SyncAPIClient()
-    await run_in_threadpool(client.make_request, data=my_data)
-```
-
-### FastAPI response serialization
-If you think you can return Pydantic object that matches your route's `response_model` to make some optimizations,
-then it's wrong. 
-
-FastAPI firstly converts that pydantic object to dict with its `jsonable_encoder`, then validates 
-data with your `response_model`, and only then serializes your object to JSON. 
-```python
-from fastapi import FastAPI
-from pydantic import BaseModel, root_validator
-
-app = FastAPI()
-
-
-class ProfileResponse(BaseModel):
-    @model_validator(mode="after")
-    def debug_usage(self):
-        print("created pydantic model")
-
-        return self
-
-
-@app.get("/", response_model=ProfileResponse)
-async def root():
-    return ProfileResponse()
-```
-**Logs Output:**
-```
-[INFO] [2022-08-28 12:00:00.000000] created pydantic model
-[INFO] [2022-08-28 12:00:00.000020] created pydantic model
-```
 
 ### Docs
 1. Unless your API is public, hide docs by default. Show it explicitly on the selected envs only.
