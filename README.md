@@ -113,7 +113,7 @@ from src.posts.constants import ErrorCode as PostsErrorCode  # in case we have S
 ## Async Routes
 FastAPI is an async framework, in the first place. It is designed to work with async I/O operations and that is the reason it is so fast. 
 
-However, FastAPI doesn't restrict you to use only `async` routes, and the developer can use `sync` routes as well (with a price).
+However, FastAPI doesn't restrict you to use only `async` routes, and the developer can use `sync` routes as well (with a price). This might confuse beginner developers into believing that they are the same, but they are not.
 
 ### I/O Intensive Tasks
 Under the hood, FastAPI can [effectively handle](https://fastapi.tiangolo.com/async/#path-operation-functions) both async and sync I/O operations. 
