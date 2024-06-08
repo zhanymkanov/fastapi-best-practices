@@ -179,7 +179,7 @@ async def perfect_ping():
 > [!WARNING]
 > Notes on the thread pool:
 > - Threads require more resources than coroutines, so they are not as cheap as async I/O operations.
-> - Thread pool has a limited number of threads, i.e. you might run out of threads and your app will become slow. [Read more](https://github.com/Kludex/fastapi-tips?tab=readme-ov-file#2-be-careful-with-non-async-functions)
+> - Thread pool has a limited number of threads, i.e. you might run out of threads and your app will become slow. [Read more](https://github.com/Kludex/fastapi-tips?tab=readme-ov-file#2-be-careful-with-non-async-functions) (external link)
 
 ### CPU Intensive Tasks
 The second caveat is that operations that are non-blocking awaitables or are sent to the thread pool must be I/O intensive tasks (e.g. open file, db call, external API call).
@@ -464,7 +464,9 @@ FastAPI supports both `sync` and `async` dependencies, and there is a temptation
 
 Just as with routes, `sync` dependencies are run in the thread pool. And threads here also come with a price and limitations, that are redundant, if you just make a small non-I/O operation.
 
-[See more](https://github.com/Kludex/fastapi-tips?tab=readme-ov-file#9-your-dependencies-may-be-running-on-threads)
+[See more](https://github.com/Kludex/fastapi-tips?tab=readme-ov-file#9-your-dependencies-may-be-running-on-threads) (external link)
+
+
 ## Miscellaneous
 ### Follow the REST
 Developing RESTful API makes it easier to reuse dependencies in routes like these:
