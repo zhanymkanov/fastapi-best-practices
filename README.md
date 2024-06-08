@@ -38,7 +38,7 @@ There are many ways to structure a project, but the best structure is one that i
 
 Many example projects and tutorials divide the project by file type (e.g., crud, routers, models), which works well for microservices or projects with fewer scopes. However, this approach didn't fit our monolith with many domains and modules.
 
-The structure I found more scalable and evolvable for these cases is inspired by Netflix's Dispatch, with some minor modifications.
+The structure I found more scalable and evolvable for these cases is inspired by Netflix's [Dispatch](https://github.com/Netflix/dispatch), with some minor modifications.
 ```
 fastapi-project
 ├── alembic/
