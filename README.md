@@ -807,7 +807,7 @@ It's a popular good practice to use pre-commit hooks, but just using the script 
 #!/bin/sh -e
 set -x
 
-ruff --fix src
+ruff check --fix src
 ruff format src
 ```
 
