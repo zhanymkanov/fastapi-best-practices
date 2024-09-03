@@ -373,7 +373,7 @@ async def parse_jwt_data(
 
 async def valid_owned_post(
     post: dict[str, Any] = Depends(valid_post_id), 
-    token_data: ddict[str, Any] = Depends(parse_jwt_data),
+    token_data: dict[str, Any] = Depends(parse_jwt_data),
 ) -> dict[str, Any]:
     if post["creator_id"] != token_data["user_id"]:
         raise UserNotOwner()
