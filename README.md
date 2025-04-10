@@ -3,7 +3,7 @@ Opinionated list of best practices and conventions I use in startups.
 
 For the last several years in production,
 we have been making good and bad decisions that impacted our developer experience dramatically.
-Some of them are worth sharing. 
+Some of them are worth sharing.
 
 ## Contents  <!-- omit from toc -->
 - [Project Structure](#project-structure)
@@ -111,7 +111,7 @@ from src.posts.constants import ErrorCode as PostsErrorCode  # in case we have S
 ```
 
 ## Async Routes
-FastAPI is an async framework, in the first place. It is designed to work with async I/O operations and that is the reason it is so fast. 
+FastAPI is an async framework, in the first place. It is designed to work with async I/O operations and that is the reason it is so fast.
 
 However, FastAPI doesn't restrict you to use only `async` routes, and the developer can use `sync` routes as well. This might confuse beginner developers into believing that they are the same, but they are not.
 
@@ -123,8 +123,8 @@ from executing the tasks.
 - If the route is defined `async` then it's called regularly via `await` 
 and FastAPI trusts you to do only non-blocking I/O operations.
 
-The caveat is if you fail that trust and execute blocking operations within async routes, 
-the event loop will not be able to run the next tasks until that blocking operation is done.
+The caveat is that if you violate that trust and execute blocking operations within async routes,
+the event loop will not be able to run subsequent tasks until the blocking operation completes.
 ```python
 import asyncio
 import time
@@ -186,7 +186,7 @@ The second caveat is that operations that are non-blocking awaitables or are sen
 - Awaiting CPU-intensive tasks (e.g. heavy calculations, data processing, video transcoding) is worthless since the CPU has to work to finish the tasks, 
 while I/O operations are external and server does nothing while waiting for that operations to finish, thus it can go to the next tasks.
 - Running CPU-intensive tasks in other threads also isn't effective, because of [GIL](https://realpython.com/python-gil/). 
-In short, GIL allows only one thread to work at a time, which makes it useless for CPU tasks. 
+In short, GIL allows only one thread to work at a time, which makes it useless for CPU tasks.
 - If you want to optimize CPU intensive tasks you should send them to workers in another process.
 
 **Related StackOverflow questions of confused users**
@@ -346,7 +346,7 @@ If we didn't put data validation to dependency, we would have to validate `post_
 for every endpoint and write the same tests for each of them. 
 
 ### Chain Dependencies
-Dependencies can use other dependencies and avoid code repetition for the similar logic.
+Dependencies can use other dependencies and avoid code repetition for similar logic.
 ```python
 # dependencies.py
 from fastapi.security import OAuth2PasswordBearer
@@ -474,7 +474,7 @@ Developing RESTful API makes it easier to reuse dependencies in routes like thes
    2. `GET /courses/:course_id/chapters/:chapter_id/lessons`
    3. `GET /chapters/:chapter_id`
 
-The only caveat is to use the same variable names in the path:
+The only caveat is having to use the same variable names in the path:
 - If you have two endpoints `GET /profiles/:profile_id` and `GET /creators/:creator_id`
 that both validate whether the given `profile_id` exists,  but `GET /creators/:creator_id`
 also checks if the profile is creator, then it's better to rename `creator_id` path variable to `profile_id` and chain those two dependencies.
@@ -510,11 +510,16 @@ async def get_user_profile_by_id(
 
 ```
 ### FastAPI response serialization
-If you think you can return Pydantic object that matches your route's `response_model` to make some optimizations,
-then it's wrong. 
+You may think you can return Pydantic object that matches your route's `response_model` to make some optimizations,
+but you'd be wrong.
 
-FastAPI firstly converts that pydantic object to dict with its `jsonable_encoder`, then validates 
-data with your `response_model`, and only then serializes your object to JSON. 
+FastAPI first converts that pydantic object to dict with its `jsonable_encoder`, then validates 
+data with your `response_model`, and only then serializes your object to JSON.
+
+This means your Pydantic model object is created twice:
+- First, when you explicitly create it to return from your route.
+- Second, implicitly by FastAPI to validate the response data according to the response_model.
+
 ```python
 from fastapi import FastAPI
 from pydantic import BaseModel, root_validator
