@@ -643,7 +643,7 @@ router = APIRouter()
         },
         status.HTTP_201_CREATED: {
             "model": CreatedResponse,  # custom pydantic model for 201 response
-            "description": "Creates something from user request ",
+            "description": "Creates something from user request",
         },
         status.HTTP_202_ACCEPTED: {
             "model": AcceptedResponse,  # custom pydantic model for 202 response
