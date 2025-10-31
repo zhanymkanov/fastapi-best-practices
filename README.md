@@ -576,6 +576,7 @@ from pydantic import BaseModel, field_validator
 
 class ProfileCreate(BaseModel):
     username: str
+    password: str
     
     @field_validator("password", mode="after")
     @classmethod
@@ -599,7 +600,7 @@ router = APIRouter()
 
 
 @router.post("/profiles")
-async def get_creator_posts(profile_data: ProfileCreate):
+async def create_profile(profile_data: ProfileCreate):
    pass
 ```
 **Response Example:**
