@@ -204,11 +204,11 @@ Pydantic has a rich set of features to validate and transform data.
 In addition to regular features like required & non-required fields with default values, 
 Pydantic has built-in comprehensive data processing tools like regex, enums, strings manipulation, emails validation, etc.
 ```python
-from enum import Enum
+from enum import StrEnum
 from pydantic import AnyUrl, BaseModel, EmailStr, Field
 
 
-class MusicBand(str, Enum):
+class MusicBand(StrEnum):
    AEROSMITH = "AEROSMITH"
    QUEEN = "QUEEN"
    ACDC = "AC/DC"
