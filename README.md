@@ -1,9 +1,9 @@
 ## FastAPI Best Practices <!-- omit from toc -->
-Opinionated list of best practices and conventions I use in startups.
+Opinionated list of best practices and conventions we use at our startups.
 
-For the last several years in production,
-we have been making good and bad decisions that impacted our developer experience dramatically.
-Some of them are worth sharing.
+After several years of building production systems,
+we've made both good and bad decisions that significantly impacted our developer experience.
+Here are some lessons worth sharing.
 
 *[简体中文](./README_ZH.md)*
 
@@ -38,9 +38,9 @@ Some of them are worth sharing.
 ## Project Structure
 There are many ways to structure a project, but the best structure is one that is consistent, straightforward, and free of surprises.
 
-Many example projects and tutorials divide the project by file type (e.g., crud, routers, models), which works well for microservices or projects with fewer scopes. However, this approach didn't fit our monolith with many domains and modules.
+Many example projects and tutorials organize projects by file type (e.g., crud, routers, models), which works well for microservices or smaller projects. However, this approach didn't scale well for our monolith with many domains and modules.
 
-The structure I found more scalable and evolvable for these cases is inspired by Netflix's [Dispatch](https://github.com/Netflix/dispatch), with some minor modifications.
+The structure I found more scalable and evolvable is inspired by Netflix's [Dispatch](https://github.com/Netflix/dispatch), with some minor modifications.
 ```
 fastapi-project
 ├── alembic/
@@ -113,20 +113,16 @@ from src.posts.constants import ErrorCode as PostsErrorCode  # in case we have S
 ```
 
 ## Async Routes
-FastAPI is an async framework, in the first place. It is designed to work with async I/O operations and that is the reason it is so fast.
+FastAPI is an async-first framework—it's designed to work with async I/O operations, which is why it's so fast.
 
-However, FastAPI doesn't restrict you to use only `async` routes, and the developer can use `sync` routes as well. This might confuse beginner developers into believing that they are the same, but they are not.
+However, FastAPI doesn't restrict you to only `async` routes; you can use `sync` routes too. This might confuse beginners into thinking they're the same, but they're not.
 
 ### I/O Intensive Tasks
-Under the hood, FastAPI can [effectively handle](https://fastapi.tiangolo.com/async/#path-operation-functions) both async and sync I/O operations. 
-- FastAPI runs `sync` routes in the [threadpool](https://en.wikipedia.org/wiki/Thread_pool) 
-and blocking I/O operations won't stop the [event loop](https://docs.python.org/3/library/asyncio-eventloop.html) 
-from executing the tasks. 
-- If the route is defined `async` then it's called regularly via `await` 
-and FastAPI trusts you to do only non-blocking I/O operations.
+Under the hood, FastAPI can [effectively handle](https://fastapi.tiangolo.com/async/#path-operation-functions) both async and sync I/O operations:
+- FastAPI runs `sync` routes in a [threadpool](https://en.wikipedia.org/wiki/Thread_pool), so blocking I/O operations won't stop the [event loop](https://docs.python.org/3/library/asyncio-eventloop.html) from executing other tasks.
+- If the route is defined as `async`, it's called via `await` and FastAPI trusts you to only perform non-blocking I/O operations.
 
-The caveat is that if you violate that trust and execute blocking operations within async routes,
-the event loop will not be able to run subsequent tasks until the blocking operation completes.
+The caveat is that if you violate that trust and execute blocking operations within async routes, the event loop won't be able to run other tasks until the blocking operation completes.
 ```python
 import asyncio
 import time
@@ -158,25 +154,24 @@ async def perfect_ping():
 ```
 **What happens when we call:**
 1. `GET /terrible-ping`
-   1. FastAPI server receives a request and starts handling it 
-   2. Server's event loop and all the tasks in the queue will be waiting until `time.sleep()` is finished
-      1. Server thinks `time.sleep()` is not an I/O task, so it waits until it is finished
+   1. FastAPI server receives a request and starts handling it
+   2. Server's event loop and all queued tasks wait until `time.sleep()` finishes
+      1. Since the route is `async`, the server doesn't offload it to a threadpool—it blocks the entire event loop
       2. Server won't accept any new requests while waiting
-   3. Server returns the response. 
-      1. After a response, server starts accepting new requests
+   3. Server returns the response
+      1. Only after responding does the server resume accepting new requests
 2. `GET /good-ping`
    1. FastAPI server receives a request and starts handling it
-   2. FastAPI sends the whole route `good_ping` to the threadpool, where a worker thread will run the function
-   3. While `good_ping` is being executed, event loop selects next tasks from the queue and works on them (e.g. accept new request, call db)
-      - Independently of main thread (i.e. our FastAPI app), 
-        worker thread will be waiting for `time.sleep` to finish.
-      - Sync operation blocks only the side thread, not the main one.
-   4. When `good_ping` finishes its work, server returns a response to the client
+   2. FastAPI sends the entire `good_ping` route to the threadpool, where a worker thread runs the function
+   3. While `good_ping` executes, the event loop continues processing other tasks (e.g., accepting new requests, calling the database)
+      - The worker thread waits for `time.sleep` to finish, independently of the main thread
+      - The sync operation blocks only the worker thread, not the main event loop
+   4. When `good_ping` finishes, the server returns a response to the client
 3. `GET /perfect-ping`
    1. FastAPI server receives a request and starts handling it
    2. FastAPI awaits `asyncio.sleep(10)`
-   3. Event loop selects next tasks from the queue and works on them (e.g. accept new request, call db)
-   4. When `asyncio.sleep(10)` is done, servers finishes the execution of the route and returns a response to the client
+   3. Event loop continues processing other tasks from the queue (e.g., accepting new requests, calling the database)
+   4. When `asyncio.sleep(10)` completes, the server finishes executing the route and returns a response to the client
 
 > [!WARNING]
 > Notes on the thread pool:
@@ -184,12 +179,10 @@ async def perfect_ping():
 > - Thread pool has a limited number of threads, i.e. you might run out of threads and your app will become slow. [Read more](https://github.com/Kludex/fastapi-tips?tab=readme-ov-file#2-be-careful-with-non-async-functions) (external link)
 
 ### CPU Intensive Tasks
-The second caveat is that operations that are non-blocking awaitables or are sent to the thread pool must be I/O intensive tasks (e.g. open file, db call, external API call).
-- Awaiting CPU-intensive tasks (e.g. heavy calculations, data processing, video transcoding) is worthless since the CPU has to work to finish the tasks, 
-while I/O operations are external and server does nothing while waiting for that operations to finish, thus it can go to the next tasks.
-- Running CPU-intensive tasks in other threads also isn't effective, because of [GIL](https://realpython.com/python-gil/). 
-In short, GIL allows only one thread to work at a time, which makes it useless for CPU tasks.
-- If you want to optimize CPU intensive tasks you should send them to workers in another process.
+The second caveat is that non-blocking awaitables and threadpool offloading are only beneficial for I/O intensive tasks (e.g., file operations, database calls, external API requests).
+- Awaiting CPU-intensive tasks (e.g., heavy calculations, data processing, video transcoding) provides no benefit since the CPU must actively work to complete them. In contrast, I/O operations are external—the server just waits for a response and can handle other tasks in the meantime.
+- Running CPU-intensive tasks in other threads is also ineffective due to the [GIL](https://realpython.com/python-gil/). In short, the GIL allows only one thread to execute Python bytecode at a time, making threads ineffective for CPU-bound work.
+- To optimize CPU-intensive tasks, you should offload them to worker processes (e.g., using `multiprocessing` or a task queue like Celery).
 
 **Related StackOverflow questions of confused users**
 1. https://stackoverflow.com/questions/62976648/architecture-flask-vs-fastapi/70309597#70309597
@@ -201,8 +194,8 @@ In short, GIL allows only one thread to work at a time, which makes it useless f
 ### Excessively use Pydantic
 Pydantic has a rich set of features to validate and transform data. 
 
-In addition to regular features like required & non-required fields with default values, 
-Pydantic has built-in comprehensive data processing tools like regex, enums, strings manipulation, emails validation, etc.
+In addition to standard features like required and optional fields with default values,
+Pydantic has built-in data processing tools like regex validation, enums, string manipulation, email validation, and more.
 ```python
 from enum import Enum
 from pydantic import AnyUrl, BaseModel, EmailStr, Field
@@ -257,7 +250,7 @@ In the example above, we have decided to create a global base model that:
 - Serializes all datetime fields to a standard format with an explicit timezone
 - Provides a method to return a dict with only serializable fields
 ### Decouple Pydantic BaseSettings
-BaseSettings was a great innovation for reading environment variables, but having a single BaseSettings for the whole app can become messy over time. To improve maintainability and organization, we have split the BaseSettings across different modules and domains.
+BaseSettings is great for reading environment variables, but a single BaseSettings for the whole app gets messy. Split it across modules and domains.
 ```python
 # src.auth.config
 from datetime import timedelta
@@ -309,11 +302,11 @@ settings = Config()
 
 ## Dependencies
 ### Beyond Dependency Injection
-Pydantic is a great schema validator, but for complex validations that involve calling a database or external services, it is not sufficient.
+Pydantic is a great schema validator, but for complex validations that require database or external service calls, it's not enough.
 
-FastAPI documentation mostly presents dependencies as DI for endpoints, but they are also excellent for request validation.
+FastAPI docs mostly present dependencies as DI for endpoints, but they're also great for request validation.
 
-Dependencies can be used to validate data against database constraints (e.g., checking if an email already exists, ensuring a user is found, etc.).
+Dependencies can validate data against database constraints (e.g., checking if an email already exists, ensuring a user exists, etc.).
 ```python
 # dependencies.py
 async def valid_post_id(post_id: UUID4) -> dict[str, Any]:
@@ -344,8 +337,8 @@ async def get_post_reviews(post: dict[str, Any] = Depends(valid_post_id)):
     post_reviews = await reviews_service.get_by_post_id(post["id"])
     return post_reviews
 ```
-If we didn't put data validation to dependency, we would have to validate `post_id` exists
-for every endpoint and write the same tests for each of them. 
+If we didn't put data validation in a dependency, we would have to validate that `post_id` exists
+in every endpoint and write the same tests for each of them. 
 
 ### Chain Dependencies
 Dependencies can use other dependencies and avoid code repetition for similar logic.
@@ -462,9 +455,9 @@ async def get_user_post(
 ```
 
 ### Prefer `async` dependencies
-FastAPI supports both `sync` and `async` dependencies, and there is a temptation to use `sync` dependencies, when you don't have to await anything, but that might not be the best choice.
+FastAPI supports both `sync` and `async` dependencies. It's tempting to use `sync` when you don't need to await anything, but that's not the best choice.
 
-Just as with routes, `sync` dependencies are run in the thread pool. And threads here also come with a price and limitations, that are redundant, if you just make a small non-I/O operation.
+Just like routes, `sync` dependencies run in a threadpool. Threads have overhead that's unnecessary for small non-I/O operations.
 
 [See more](https://github.com/Kludex/fastapi-tips?tab=readme-ov-file#9-your-dependencies-may-be-running-on-threads) (external link)
 
@@ -512,11 +505,9 @@ async def get_user_profile_by_id(
 
 ```
 ### FastAPI response serialization
-You may think you can return Pydantic object that matches your route's `response_model` to make some optimizations,
-but you'd be wrong.
+You might think you can return a Pydantic object that matches your route's `response_model` and skip some processing steps, but you'd be wrong.
 
-FastAPI first converts that pydantic object to dict with its `jsonable_encoder`, then validates 
-data with your `response_model`, and only then serializes your object to JSON.
+FastAPI first converts the Pydantic object to a dict using `jsonable_encoder`, then validates the data against your `response_model`, and only then serializes it to JSON.
 
 This means your Pydantic model object is created twice:
 - First, when you explicitly create it to return from your route.
@@ -524,7 +515,7 @@ This means your Pydantic model object is created twice:
 
 ```python
 from fastapi import FastAPI
-from pydantic import BaseModel, root_validator
+from pydantic import BaseModel, model_validator
 
 app = FastAPI()
 
@@ -548,10 +539,9 @@ async def root():
 ```
 
 ### If you must use sync SDK, then run it in a thread pool.
-If you must use a library to interact with external services, and it's not `async`,
-then make the HTTP calls in an external worker thread.
+If you must use a library that's not `async`, run the HTTP calls in an external worker thread.
 
-We can use the well-known `run_in_threadpool` from starlette.
+Use `run_in_threadpool` from Starlette.
 ```python
 from fastapi import FastAPI
 from fastapi.concurrency import run_in_threadpool
@@ -569,7 +559,7 @@ async def call_my_sync_library():
 ```
 
 ### ValueErrors might become Pydantic ValidationError
-If you raise a `ValueError` in a Pydantic schema that is directly faced by the client, it will return a nice detailed response to users.
+If you raise a `ValueError` in a Pydantic schema that's used directly in a request body, FastAPI will return a detailed validation error response to users.
 ```python
 # src.profiles.schemas
 from pydantic import BaseModel, field_validator
@@ -674,11 +664,9 @@ POSTGRES_INDEXES_NAMING_CONVENTION = {
 metadata = MetaData(naming_convention=POSTGRES_INDEXES_NAMING_CONVENTION)
 ```
 ### Migrations. Alembic
-1. Migrations must be static and revertable.
-If your migrations depend on dynamically generated data, then 
-make sure the only thing that is dynamic is the data itself, not its structure.
-2. Generate migrations with descriptive names & slugs. Slug is required and should explain the changes.
-3. Set human-readable file template for new migrations. We use `*date*_*slug*.py` pattern, e.g. `2022-08-24_post_content_idx.py`
+1. Migrations must be static and reversible. If your migrations depend on dynamically generated data, make sure only the data itself is dynamic, not its structure.
+2. Generate migrations with descriptive names and slugs. The slug is required and should explain the changes.
+3. Set a human-readable file template for new migrations. We use the `*date*_*slug*.py` pattern, e.g., `2022-08-24_post_content_idx.py`
 ```
 # alembic.ini
 file_template = %%(year)d-%%(month).2d-%%(day).2d_%%(slug)s
@@ -779,7 +767,7 @@ async def get_creator_posts(creator: dict[str, Any] = Depends(valid_creator_id))
    return posts
 ```
 ### Set tests client async from day 0
-Writing integration tests with DB will most likely lead to messed up event loop errors in the future.
+Writing integration tests with DB will likely lead to messed up event loop errors in the future.
 Set the async test client immediately, e.g. [httpx](https://github.com/encode/starlette/issues/652)
 ```python
 import pytest
@@ -802,7 +790,7 @@ async def test_create_post(client: TestClient):
 
     assert resp.status_code == 201
 ```
-Unless you have sync db connections (excuse me?) or aren't planning to write integration tests.
+Unless you have synchronous database connections (excuse me?) or don't plan to write integration tests.
 
 ### Use ruff
 With linters, you can forget about formatting the code and focus on writing the business logic.
