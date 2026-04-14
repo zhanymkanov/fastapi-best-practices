@@ -222,7 +222,7 @@ class UserBase(BaseModel):
     first_name: str = Field(min_length=1, max_length=128)
     username: str = Field(min_length=1, max_length=128, pattern="^[A-Za-z0-9-_]+$")
     email: EmailStr
-    age: int = Field(ge=18, default=None)  # 必须大于或等于18
+    age: int = Field(ge=18)  # 必须大于或等于18
     favorite_band: MusicBand | None = None  # 只允许输入"AEROSMITH"、"QUEEN"、"AC/DC"值
     website: AnyUrl | None = None
 ```
@@ -233,22 +233,22 @@ class UserBase(BaseModel):
 
 ```python
 from datetime import datetime
+from typing import Any
 from zoneinfo import ZoneInfo
 
 from fastapi.encoders import jsonable_encoder
-from pydantic import BaseModel, ConfigDict
-
-def datetime_to_gmt_str(dt: datetime) -> str:
-    if not dt.tzinfo:
-        dt = dt.replace(tzinfo=ZoneInfo("UTC"))
-
-    return dt.strftime("%Y-%m-%dT%H:%M:%S%z")
+from pydantic import BaseModel, ConfigDict, field_serializer
 
 class CustomModel(BaseModel):
-    model_config = ConfigDict(
-        json_encoders={datetime: datetime_to_gmt_str},
-        populate_by_name=True,
-    )
+    model_config = ConfigDict(populate_by_name=True)
+
+    @field_serializer("*", when_used="json", check_fields=False)
+    def _serialize_datetimes(self, value: Any) -> Any:
+        if isinstance(value, datetime):
+            if value.tzinfo is None:
+                value = value.replace(tzinfo=ZoneInfo("UTC"))
+            return value.strftime("%Y-%m-%dT%H:%M:%S%z")
+        return value
 
     def serializable_dict(self, **kwargs):
         """返回仅包含可序列化字段的字典。"""
@@ -285,7 +285,7 @@ class AuthConfig(BaseSettings):
 auth_settings = AuthConfig()
 
 # src.config
-from pydantic import PostgresDsn, RedisDsn, model_validator
+from pydantic import PostgresDsn, RedisDsn
 from pydantic_settings import BaseSettings
 
 from src.constants import Environment
@@ -356,7 +356,8 @@ async def get_post_reviews(post: dict[str, Any] = Depends(valid_post_id)):
 ```python
 # dependencies.py
 from fastapi.security import OAuth2PasswordBearer
-from jose import JWTError, jwt
+import jwt  # PyJWT
+from jwt.exceptions import InvalidTokenError
 
 async def valid_post_id(post_id: UUID4) -> dict[str, Any]:
     post = await service.get_by_id(post_id)
@@ -370,7 +371,7 @@ async def parse_jwt_data(
 ) -> dict[str, Any]:
     try:
         payload = jwt.decode(token, "JWT_SECRET", algorithms=["HS256"])
-    except JWTError:
+    except InvalidTokenError:
         raise InvalidCredentials()
 
     return {"user_id": payload["id"]}
@@ -408,7 +409,8 @@ async def get_user_post(post: dict[str, Any] = Depends(valid_owned_post)):
 # dependencies.py
 from fastapi import BackgroundTasks
 from fastapi.security import OAuth2PasswordBearer
-from jose import JWTError, jwt
+import jwt  # PyJWT
+from jwt.exceptions import InvalidTokenError
 
 async def valid_post_id(post_id: UUID4) -> Mapping:
     post = await service.get_by_id(post_id)
@@ -422,7 +424,7 @@ async def parse_jwt_data(
 ) -> dict:
     try:
         payload = jwt.decode(token, "JWT_SECRET", algorithms=["HS256"])
-    except JWTError:
+    except InvalidTokenError:
         raise InvalidCredentials()
 
     return {"user_id": payload["id"]}
@@ -804,20 +806,21 @@ async def get_creator_posts(creator: dict[str, Any] = Depends(valid_creator_id))
 使用数据库编写集成测试很可能在将来导致混乱的事件循环错误。立即设置异步测试客户端，例如[httpx](https://github.com/encode/starlette/issues/652)
 
 ```python
+from typing import AsyncGenerator
+
 import pytest
-from async_asgi_testclient import TestClient
+from httpx import AsyncClient, ASGITransport
 
 from src.main import app  # inited FastAPI app
 
 @pytest.fixture
-async def client() -> AsyncGenerator[TestClient, None]:
-    host, port = "127.0.0.1", "9000"
-
-    async with AsyncClient(transport=ASGITransport(app=app, client=(host, port)), base_url="http://test") as client:
-        yield client
+async def client() -> AsyncGenerator[AsyncClient, None]:
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        yield ac
 
 @pytest.mark.asyncio
-async def test_create_post(client: TestClient):
+async def test_create_post(client: AsyncClient):
     resp = await client.post("/posts")
 
     assert resp.status_code == 201
