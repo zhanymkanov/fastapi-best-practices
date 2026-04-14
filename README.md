@@ -5,6 +5,12 @@ After several years of building production systems,
 we've made both good and bad decisions that significantly impacted our developer experience.
 Here are some lessons worth sharing.
 
+> **Working with an AI agent?** See [AGENTS.md](./AGENTS.md) for the same rules in a
+> terse, machine-readable format with a version matrix, Do/Don't blocks, and an
+> anti-patterns checklist.
+
+**Tested against:** Python 3.11+ · FastAPI 0.115+ · Pydantic 2.7+ · SQLAlchemy 2.0+ · Alembic 1.13+ · httpx 0.27+ · PyJWT 2.9+ · ruff 0.6+
+
 *[简体中文](./README_ZH.md)*
 
 ## Contents  <!-- omit from toc -->
@@ -25,6 +31,7 @@ Here are some lessons worth sharing.
   - [Follow the REST](#follow-the-rest)
   - [FastAPI response serialization](#fastapi-response-serialization)
   - [If you must use sync SDK, then run it in a thread pool.](#if-you-must-use-sync-sdk-then-run-it-in-a-thread-pool)
+  - [BackgroundTasks vs a real task queue](#backgroundtasks-vs-a-real-task-queue)
   - [ValueErrors might become Pydantic ValidationError](#valueerrors-might-become-pydantic-validationerror)
   - [Docs](#docs)
   - [Set DB keys naming conventions](#set-db-keys-naming-conventions)
@@ -211,7 +218,7 @@ class UserBase(BaseModel):
     first_name: str = Field(min_length=1, max_length=128)
     username: str = Field(min_length=1, max_length=128, pattern="^[A-Za-z0-9-_]+$")
     email: EmailStr
-    age: int = Field(ge=18, default=None)  # must be greater or equal to 18
+    age: int = Field(ge=18)  # required, must be greater or equal to 18
     favorite_band: MusicBand | None = None  # only "AEROSMITH", "QUEEN", "AC/DC" values are allowed to be inputted
     website: AnyUrl | None = None
 ```
@@ -219,24 +226,23 @@ class UserBase(BaseModel):
 Having a controllable global base model allows us to customize all the models within the app. For instance, we can enforce a standard datetime format or introduce a common method for all subclasses of the base model.
 ```python
 from datetime import datetime
+from typing import Any
 from zoneinfo import ZoneInfo
 
 from fastapi.encoders import jsonable_encoder
-from pydantic import BaseModel, ConfigDict
-
-
-def datetime_to_gmt_str(dt: datetime) -> str:
-    if not dt.tzinfo:
-        dt = dt.replace(tzinfo=ZoneInfo("UTC"))
-
-    return dt.strftime("%Y-%m-%dT%H:%M:%S%z")
+from pydantic import BaseModel, ConfigDict, field_serializer
 
 
 class CustomModel(BaseModel):
-    model_config = ConfigDict(
-        json_encoders={datetime: datetime_to_gmt_str},
-        populate_by_name=True,
-    )
+    model_config = ConfigDict(populate_by_name=True)
+
+    @field_serializer("*", when_used="json", check_fields=False)
+    def _serialize_datetimes(self, value: Any) -> Any:
+        if isinstance(value, datetime):
+            if value.tzinfo is None:
+                value = value.replace(tzinfo=ZoneInfo("UTC"))
+            return value.strftime("%Y-%m-%dT%H:%M:%S%z")
+        return value
 
     def serializable_dict(self, **kwargs):
         """Return a dict which contains only serializable fields."""
@@ -247,7 +253,7 @@ class CustomModel(BaseModel):
 
 ```
 In the example above, we have decided to create a global base model that:
-- Serializes all datetime fields to a standard format with an explicit timezone
+- Serializes all datetime fields to a standard format with an explicit timezone (using `@field_serializer` — `json_encoders` is deprecated in Pydantic v2)
 - Provides a method to return a dict with only serializable fields
 ### Decouple Pydantic BaseSettings
 BaseSettings is great for reading environment variables, but a single BaseSettings for the whole app gets messy. Split it across modules and domains.
@@ -273,7 +279,7 @@ auth_settings = AuthConfig()
 
 
 # src.config
-from pydantic import PostgresDsn, RedisDsn, model_validator
+from pydantic import PostgresDsn, RedisDsn
 from pydantic_settings import BaseSettings
 
 from src.constants import Environment
@@ -301,6 +307,18 @@ settings = Config()
 ```
 
 ## Dependencies
+
+> **Note on syntax.** The examples below use the default-argument form (`x = Depends(...)`) for readability and historical continuity. Since FastAPI 0.95 the idiomatic form is `Annotated[T, Depends(...)]` — it avoids gotchas with default values and reads more naturally:
+> ```python
+> from typing import Annotated
+>
+> PostDep = Annotated[dict, Depends(valid_post_id)]
+>
+> @router.get("/posts/{post_id}")
+> async def get_post(post: PostDep): ...
+> ```
+> Both styles work. New code should prefer `Annotated`.
+
 ### Beyond Dependency Injection
 Pydantic is a great schema validator, but for complex validations that require database or external service calls, it's not enough.
 
@@ -345,7 +363,8 @@ Dependencies can use other dependencies and avoid code repetition for similar lo
 ```python
 # dependencies.py
 from fastapi.security import OAuth2PasswordBearer
-from jose import JWTError, jwt
+import jwt  # PyJWT
+from jwt.exceptions import InvalidTokenError
 
 async def valid_post_id(post_id: UUID4) -> dict[str, Any]:
     post = await service.get_by_id(post_id)
@@ -360,7 +379,7 @@ async def parse_jwt_data(
 ) -> dict[str, Any]:
     try:
         payload = jwt.decode(token, "JWT_SECRET", algorithms=["HS256"])
-    except JWTError:
+    except InvalidTokenError:
         raise InvalidCredentials()
 
     return {"user_id": payload["id"]}
@@ -397,7 +416,8 @@ but `parse_jwt_data` is called only once, in the very first call.
 # dependencies.py
 from fastapi import BackgroundTasks
 from fastapi.security import OAuth2PasswordBearer
-from jose import JWTError, jwt
+import jwt  # PyJWT
+from jwt.exceptions import InvalidTokenError
 
 async def valid_post_id(post_id: UUID4) -> Mapping:
     post = await service.get_by_id(post_id)
@@ -412,7 +432,7 @@ async def parse_jwt_data(
 ) -> dict:
     try:
         payload = jwt.decode(token, "JWT_SECRET", algorithms=["HS256"])
-    except JWTError:
+    except InvalidTokenError:
         raise InvalidCredentials()
 
     return {"user_id": payload["id"]}
@@ -558,6 +578,28 @@ async def call_my_sync_library():
     await run_in_threadpool(client.make_request, data=my_data)
 ```
 
+### BackgroundTasks vs a real task queue
+FastAPI's `BackgroundTasks` is convenient — and a footgun if you misuse it. Tasks run **after the response is sent, in the same worker process**. If the worker dies, the task is gone. There is no retry, no visibility, no scheduling.
+
+| Use `BackgroundTasks` when…                      | Use Celery / Arq / RQ when…                     |
+|--------------------------------------------------|-------------------------------------------------|
+| Task is short (< 1 second)                       | Task takes seconds to minutes                   |
+| Failure can be silently dropped                  | You need retries or dead-letter handling        |
+| It's in-process (send email, log a row)          | It's CPU-heavy or needs a separate worker pool  |
+| You don't need scheduling or rate limiting       | You need cron, ETA, or rate limiting            |
+
+```python
+from fastapi import BackgroundTasks
+
+
+@router.post("/signup")
+async def signup(data: SignupIn, bg: BackgroundTasks):
+    user = await service.create_user(data)
+    bg.add_task(send_welcome_email, user.email)  # fire-and-forget, in-process
+    return user
+```
+Rule of thumb: if you'd page someone when the task is lost, it doesn't belong in `BackgroundTasks`.
+
 ### ValueErrors might become Pydantic ValidationError
 If you raise a `ValueError` in a Pydantic schema that's used directly in a request body, FastAPI will return a detailed validation error response to users.
 ```python
@@ -686,6 +728,8 @@ Being consistent with names is important. Some rules we followed:
 - Usually, database handles data processing much faster and cleaner than CPython will ever do. 
 - It's preferable to do all the complex joins and simple data manipulations with SQL.
 - It's preferable to aggregate JSONs in DB for responses with nested objects.
+
+> The example below uses the [`encode/databases`](https://github.com/encode/databases) async wrapper for brevity. For new projects, **SQLAlchemy 2.0's async API** (`AsyncSession`, `async_sessionmaker`) is the better default — `databases` is in maintenance mode. The SQL-first principle is what matters; the client is interchangeable.
 ```python
 # src.posts.service
 from typing import Any
@@ -769,28 +813,52 @@ async def get_creator_posts(creator: dict[str, Any] = Depends(valid_creator_id))
 ```
 ### Set tests client async from day 0
 Writing integration tests with DB will likely lead to messed up event loop errors in the future.
-Set the async test client immediately, e.g. [httpx](https://github.com/encode/starlette/issues/652)
+Set the async test client immediately, using [httpx](https://www.python-httpx.org/) with `ASGITransport`.
+
+> Earlier versions of this article recommended `async_asgi_testclient`. That library is unmaintained — use `httpx.AsyncClient` directly.
+
 ```python
+from typing import AsyncGenerator
+
 import pytest
-from async_asgi_testclient import TestClient
+from httpx import AsyncClient, ASGITransport
 
 from src.main import app  # inited FastAPI app
 
 
 @pytest.fixture
-async def client() -> AsyncGenerator[TestClient, None]:
-    host, port = "127.0.0.1", "9000"
-
-    async with AsyncClient(transport=ASGITransport(app=app, client=(host, port)), base_url="http://test") as client:
-        yield client
+async def client() -> AsyncGenerator[AsyncClient, None]:
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        yield ac
 
 
 @pytest.mark.asyncio
-async def test_create_post(client: TestClient):
+async def test_create_post(client: AsyncClient):
     resp = await client.post("/posts")
 
     assert resp.status_code == 201
 ```
+
+#### Override dependencies in tests
+Don't monkeypatch internals. FastAPI's `dependency_overrides` lets you swap any dependency for a test fake — auth, external clients, anything you don't want hitting the network.
+
+```python
+from src.auth.dependencies import parse_jwt_data
+from src.main import app
+
+
+def fake_user():
+    return {"user_id": "00000000-0000-0000-0000-000000000001"}
+
+
+@pytest.fixture(autouse=True)
+def _override_auth():
+    app.dependency_overrides[parse_jwt_data] = fake_user
+    yield
+    app.dependency_overrides.clear()
+```
+
 Unless you have synchronous database connections (excuse me?) or don't plan to write integration tests.
 
 ### Use ruff
