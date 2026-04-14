@@ -253,7 +253,7 @@ class CustomModel(BaseModel):
 
 ```
 In the example above, we have decided to create a global base model that:
-- Serializes all datetime fields to a standard format with an explicit timezone (using `@field_serializer` — `json_encoders` is deprecated in Pydantic v2)
+- Serializes all datetime fields to a standard format with an explicit timezone
 - Provides a method to return a dict with only serializable fields
 ### Decouple Pydantic BaseSettings
 BaseSettings is great for reading environment variables, but a single BaseSettings for the whole app gets messy. Split it across modules and domains.
@@ -307,18 +307,6 @@ settings = Config()
 ```
 
 ## Dependencies
-
-> **Note on syntax.** The examples below use the default-argument form (`x = Depends(...)`) for readability and historical continuity. Since FastAPI 0.95 the idiomatic form is `Annotated[T, Depends(...)]` — it avoids gotchas with default values and reads more naturally:
-> ```python
-> from typing import Annotated
->
-> PostDep = Annotated[dict, Depends(valid_post_id)]
->
-> @router.get("/posts/{post_id}")
-> async def get_post(post: PostDep): ...
-> ```
-> Both styles work. New code should prefer `Annotated`.
-
 ### Beyond Dependency Injection
 Pydantic is a great schema validator, but for complex validations that require database or external service calls, it's not enough.
 
@@ -729,7 +717,7 @@ Being consistent with names is important. Some rules we followed:
 - It's preferable to do all the complex joins and simple data manipulations with SQL.
 - It's preferable to aggregate JSONs in DB for responses with nested objects.
 
-> The example below uses the [`encode/databases`](https://github.com/encode/databases) async wrapper for brevity. For new projects, **SQLAlchemy 2.0's async API** (`AsyncSession`, `async_sessionmaker`) is the better default — `databases` is in maintenance mode. The SQL-first principle is what matters; the client is interchangeable.
+For new projects, reach for SQLAlchemy 2.0's async API (`AsyncSession`, `async_sessionmaker`). The example below uses `encode/databases` for brevity — the SQL-first principle is what matters; the client is interchangeable.
 ```python
 # src.posts.service
 from typing import Any
@@ -813,9 +801,7 @@ async def get_creator_posts(creator: dict[str, Any] = Depends(valid_creator_id))
 ```
 ### Set tests client async from day 0
 Writing integration tests with DB will likely lead to messed up event loop errors in the future.
-Set the async test client immediately, using [httpx](https://www.python-httpx.org/) with `ASGITransport`.
-
-> Earlier versions of this article recommended `async_asgi_testclient`. That library is unmaintained — use `httpx.AsyncClient` directly.
+Set the async test client immediately, using [httpx](https://www.python-httpx.org/) with `ASGITransport`. Don't reach for `async_asgi_testclient` — it's unmaintained.
 
 ```python
 from typing import AsyncGenerator

@@ -1,11 +1,8 @@
 # FastAPI Best Practices for AI Agents
 
-Canonical, machine-readable ruleset for AI coding agents working in FastAPI projects.
-This file mirrors [README.md](./README.md) but is structured for fast pattern matching:
+A machine-readable companion to [README.md](./README.md) for AI coding agents
+working in FastAPI projects. Same rules, restructured for fast pattern matching:
 version pins, Do/Don't blocks, anti-patterns, and a quick-reference table.
-
-If a rule here disagrees with the README, **this file wins** — README is narrative,
-this is the spec.
 
 ## Compatibility Matrix
 
