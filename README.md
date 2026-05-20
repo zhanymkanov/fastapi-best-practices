@@ -223,9 +223,8 @@ class UserBase(BaseModel):
 ### Custom Base Model
 Having a controllable global base model allows us to customize all the models within the app. For instance, we can enforce a standard datetime format or introduce a common method for all subclasses of the base model.
 ```python
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
-from zoneinfo import ZoneInfo
 
 from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel, ConfigDict, field_serializer
@@ -238,7 +237,7 @@ class CustomModel(BaseModel):
     def _serialize_datetimes(self, value: Any) -> Any:
         if isinstance(value, datetime):
             if value.tzinfo is None:
-                value = value.replace(tzinfo=ZoneInfo("UTC"))
+                value = value.replace(tzinfo=UTC)
             return value.strftime("%Y-%m-%dT%H:%M:%S%z")
         return value
 
