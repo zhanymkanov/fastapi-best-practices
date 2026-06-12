@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QMI· 宠物生态智能管理平台</title>
+<style>
+  :root {
+    --primary: #6366f1;
+    --primary-dark: #4f46e5;
+    --bg: #f8fafc;
+    --card: #ffffff;
+    --text: #1e293b;
+    --text-muted: #64748b;
+    --border: #e2e8f0;
+    --success: #10b981;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+    --radius: 12px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.6;
+  }
+  /* ── Header ────────────────────────────── */
+  .header {
+    background: linear-gradient(135deg, var(--primary), #8b5cf6);
+    color: white; padding: 16px 32px;
+    display: flex; align-items: center; justify-content: space-between;
+    box-shadow: 0 2px 12px rgba(99,102,241,0.3);
+  }
+  .header h1 { font-size: 1.4rem; font-weight: 700; }
+  .header .badge {
+    background: rgba(255,255,255,0.2); padding: 4px 12px;
+    border-radius: 20px; font-size: 0.8rem;
+  }
+  /* ── Layout ─────────────────────────────── */
+  .container { max-width: 1400px; margin: 0 auto; padding: 24px; }
+  .tabs { display: flex; gap: 4px; margin-bottom: 24px; background: var(--card); border-radius: var(--radius); padding: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+  .tab {
+    flex: 1; padding: 12px 20px; border: none; background: transparent;
+    cursor: pointer; font-size: 0.95rem; font-weight: 500; border-radius: 10px;
+    transition: all 0.2s; color: var(--text-muted);
+  }
+  .tab.active { background: var(--primary); color: white; }
+  .tab:hover:not(.active) { background: #f1f5f9; }
+  .panel { display: none; }
+  .panel.active { display: block; }
+  /* ── Grid ──────────────────────────────── */
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 24px; }
+  .stat-card {
+    background: var(--card); border-radius: var(--radius); padding: 20px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06); border-left: 4px solid var(--primary);
+  }
+  .stat-card .label { font-size: 0.85rem; color: var(--text-muted); }
+  .stat-card .value { font-size: 2rem; font-weight: 700; margin: 4px 0; }
+  .stat-card .sub { font-size: 0.8rem; color: var(--text-muted); }
+  /* ── Chat ──────────────────────────────── */
+  .chat-layout { display: grid; grid-template-columns: 1fr 340px; gap: 20px; height: calc(100vh - 280px); min-height: 500px; }
+  .chat-main { display: flex; flex-direction: column; background: var(--card); border-radius: var(--radius); box-shadow: 0 1px 3px rgba(0,0,0,0.06); overflow: hidden; }
+  .chat-messages { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+  .msg {
+    max-width: 85%; padding: 12px 16px; border-radius: 16px; font-size: 0.92rem;
+    line-height: 1.5; animation: fadeIn 0.3s ease;
+  }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  .msg.user { align-self: flex-end; background: var(--primary); color: white; border-bottom-right-radius: 4px; }
+  .msg.assistant { align-self: flex-start; background: #f1f5f9; border-bottom-left-radius: 4px; }
+  .msg .meta { font-size: 0.7rem; opacity: 0.7; margin-top: 6px; }
+  .msg.assistant .meta { opacity: 0.6; }
+  .chat-input-area { padding: 16px; border-top: 1px solid var(--border); display: flex; gap: 8px; }
+  .chat-input-area input { flex: 1; padding: 12px 16px; border: 1px solid var(--border); border-radius: 24px; font-size: 0.92rem; outline: none; }
+  .chat-input-area input:focus { border-color: var(--primary); }
+  .chat-input-area button { padding: 10px 24px; background: var(--primary); color: white; border: none; border-radius: 24px; cursor: pointer; font-size: 0.92rem; font-weight: 500; }
+  .chat-input-area button:hover { background: var(--primary-dark); }
+  .chat-sidebar { background: var(--card); border-radius: var(--radius); padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); overflow-y: auto; }
+  .chat-sidebar h3 { font-size: 0.9rem; margin-bottom: 8px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+  .intent-tag { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 0.75rem; font-weight: 500; }
+  .intent-health { background: #dbeafe; color: #1d4ed8; }
+  .intent-device { background: #fef3c7; color: #b45309; }
+  .intent-ticket { background: #ede9fe; color: #7c3aed; }
+  .intent-general { background: #f1f5f9; color: #475569; }
+  /* ── Tools ─────────────────────────────── */
+  .tool-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+  .tool-card {
+    background: var(--card); border-radius: var(--radius); padding: 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06); cursor: pointer;
+    transition: all 0.2s; border: 2px solid transparent;
+  }
+  .tool-card:hover { border-color: var(--primary); transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+  .tool-card .cat { font-size: 0.7rem; text-transform: uppercase; font-weight: 600; color: var(--primary); margin-bottom: 4px; }
+  .tool-card .name { font-weight: 600; font-size: 1rem; }
+  .tool-card .desc { font-size: 0.82rem; color: var(--text-muted); margin-top: 4px; }
+  .tool-card .result { margin-top: 10px; padding: 10px; background: #f8fafc; border-radius: 8px; font-size: 0.78rem; font-family: 'SF Mono', Monaco, monospace; display: none; max-height: 200px; overflow-y: auto; white-space: pre-wrap; }
+  .tool-card .result.show { display: block; }
+  /* ── RAG ───────────────────────────────── */
+  .rag-box { background: var(--card); border-radius: var(--radius); padding: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); max-width: 800px; }
+  .rag-box textarea { width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 10px; font-size: 0.92rem; resize: vertical; min-height: 100px; outline: none; }
+  .rag-box textarea:focus { border-color: var(--primary); }
+  .rag-box .row { display: flex; gap: 12px; margin-top: 12px; align-items: center; }
+  .rag-box select, .rag-box input { padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 0.88rem; }
+  .rag-box button { padding: 10px 24px; background: var(--primary); color: white; border: none; border-radius: 10px; cursor: pointer; font-size: 0.9rem; font-weight: 500; }
+  .rag-result { margin-top: 16px; padding: 16px; background: #f8fafc; border-radius: var(--radius); display: none; }
+  .rag-result.show { display: block; }
+  .rag-result .answer { font-size: 0.92rem; line-height: 1.7; }
+  .rag-result .sources { margin-top: 12px; font-size: 0.78rem; color: var(--text-muted); }
+  .rag-result .source-tag { display: inline-block; background: #e0e7ff; color: #4338ca; padding: 2px 8px; border-radius: 10px; margin: 2px 4px; font-size: 0.75rem; }
+  .rag-result .backend { font-size: 0.75rem; color: var(--text-muted); margin-top: 8px; }
+  /* ── Loading ───────────────────────────── */
+  .loading { display: inline-block; width: 16px; height: 16px; border: 2px solid #e2e8f0; border-top-color: var(--primary); border-radius: 50%; animation: spin 0.6s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .typing { display: flex; gap: 4px; padding: 8px 0; }
+  .typing span { width: 6px; height: 6px; background: var(--text-muted); border-radius: 50%; animation: bounce 1.4s infinite ease-in-out both; }
+  .typing span:nth-child(1) { animation-delay: -0.32s; }
+  .typing span:nth-child(2) { animation-delay: -0.16s; }
+  @keyframes bounce { 0%,80%,100% { transform: scale(0); } 40% { transform: scale(1); } }
+  /* ── Responsive ────────────────────────── */
+  @media (max-width: 768px) {
+    .chat-layout { grid-template-columns: 1fr; }
+    .header { padding: 12px 16px; }
+    .header h1 { font-size: 1.1rem; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ── Header ─────────────────────────────────── -->
+<header class="header">
+  <div>
+    <h1>🐾 QMI· 宠物生态智能管理平台</h1>
+    <span style="font-size:0.82rem;opacity:0.85">A2A 多 Agent 编排 · MCP 工具协议 · RAG 知识库</span>
+  </div>
+  <div style="display:flex;gap:12px;align-items:center;">
+    <span id="modeBadge" class="badge">🟡 Demo 模式</span>
+    <span id="mcpCount" class="badge">🔧 0 工具</span>
+  </div>
+</header>
+
+<div class="container">
+
+<!-- ── Tabs ──────────────────────────────────── -->
+<div class="tabs">
+  <button class="tab active" onclick="switchTab('dashboard')">📊 仪表盘</button>
+  <button class="tab" onclick="switchTab('agent')">🤖 Agent 对话</button>
+  <button class="tab" onclick="switchTab('rag')">📚 RAG 知识库</button>
+  <button class="tab" onclick="switchTab('tools')">🔧 MCP 工具</button>
+</div>
+
+<!-- ════════════════ 仪表盘 ════════════════ -->
+<div id="panel-dashboard" class="panel active">
+  <div class="grid" id="statsGrid">
+    <div class="stat-card"><div class="label">🏢 租户总数</div><div class="value" id="stat-tenants">-</div></div>
+    <div class="stat-card"><div class="label">👥 用户总数</div><div class="value" id="stat-users">-</div></div>
+    <div class="stat-card"><div class="label">🐱 宠物档案</div><div class="value" id="stat-pets">-</div></div>
+    <div class="stat-card"><div class="label">📟 在线设备</div><div class="value" id="stat-devices">-</div><div class="sub" id="stat-device-rate"></div></div>
+    <div class="stat-card"><div class="label">🎫 待处理工单</div><div class="value" id="stat-tickets">-</div><div class="sub" id="stat-ticket-rate"></div></div>
+    <div class="stat-card"><div class="label">📦 数据资产</div><div class="value" id="stat-assets">-</div></div>
+  </div>
+  <div style="background:var(--card);border-radius:var(--radius);padding:20px;box-shadow:0 1px 3px rgba(0,0,0,0.06);max-width:700px;">
+    <h3 style="margin-bottom:12px;">🖥️ 系统状态</h3>
+    <div id="healthInfo" style="font-size:0.88rem;color:var(--text-muted);">加载中...</div>
+  </div>
+</div>
+
+<!-- ════════════════ Agent 对话 ════════════════ -->
+<div id="panel-agent" class="panel">
+  <div class="chat-layout">
+    <div class="chat-main">
+      <div class="chat-messages" id="chatMessages">
+        <div class="msg assistant">
+          👋 你好！我是QMI智能助手。<br>
+          可以问我：<br>
+          • 🏥 宠物健康：「猫咪呕吐怎么办？」<br>
+          • 📟 设备运维：「智能项圈离线了」<br>
+          • 🎫 客服工单：「帮我查一下工单」
+        </div>
+      </div>
+      <div class="chat-input-area">
+        <input type="text" id="chatInput" placeholder="输入你的问题..." onkeydown="if(event.key==='Enter')sendMessage()">
+        <button onclick="sendMessage()">发送</button>
+      </div>
+    </div>
+    <div class="chat-sidebar">
+      <h3>💡 快捷测试</h3>
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <button onclick="quickChat('我的狗狗最近一直咳嗽，精神也不太好')" style="padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:white;cursor:pointer;text-align:left;font-size:0.85rem;">🐶 狗狗咳嗽怎么办</button>
+        <button onclick="quickChat('智能项圈离线了，怎么排查？')" style="padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:white;cursor:pointer;text-align:left;font-size:0.85rem;">📟 设备离线排查</button>
+        <button onclick="quickChat('帮我创建一个设备故障的工单')" style="padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:white;cursor:pointer;text-align:left;font-size:0.85rem;">🎫 创建工单</button>
+        <button onclick="quickChat('猫咪需要打哪些疫苗？')" style="padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:white;cursor:pointer;text-align:left;font-size:0.85rem;">💉 疫苗咨询</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════ RAG 知识库 ════════════════ -->
+<div id="panel-rag" class="panel">
+  <div class="rag-box">
+    <h3 style="margin-bottom:12px;">📚 知识库智能问答</h3>
+    <textarea id="ragQuestion" placeholder="输入你想查询的问题，例如：猫咪口炎怎么治疗？"></textarea>
+    <div class="row">
+      <select id="ragCategory">
+        <option value="">全部分类</option>
+        <option value="health">🏥 宠物健康</option>
+        <option value="device">📟 设备说明</option>
+        <option value="ota">🔄 OTA升级</option>
+        <option value="member">👑 会员政策</option>
+      </select>
+      <input type="number" id="ragTopK" value="5" min="1" max="10" style="width:80px;" title="返回文档数">
+      <button onclick="ragQuery()">🔍 检索问答</button>
+    </div>
+    <div class="rag-result" id="ragResult">
+      <div class="answer" id="ragAnswer"></div>
+      <div class="sources" id="ragSources"></div>
+      <div class="backend" id="ragBackend"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════ MCP 工具 ════════════════ -->
+<div id="panel-tools" class="panel">
+  <div class="tool-grid" id="toolGrid">加载中...</div>
+</div>
+
+</div><!-- /container -->
+
+<script>
+const API = '/api/v1';
+const sessionId = 'web_' + Math.random().toString(36).slice(2, 10);
+
+// ── Tab 切换 ──────────────────────────────────
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelector(`.tab:nth-child(${{dashboard:1,agent:2,rag:3,tools:4}[name]})`).classList.add('active');
+  document.getElementById(`panel-${name}`).classList.add('active');
+
+  if (name === 'dashboard') loadDashboard();
+  if (name === 'tools') loadTools();
+  if (name === 'agent') document.getElementById('chatInput').focus();
+}
+
+// ── Dashboard ─────────────────────────────────
+async function loadDashboard() {
+  try {
+    // 系统状态
+    const hres = await fetch('/health/ready');
+    const hdata = await hres.json();
+    document.getElementById('healthInfo').innerHTML =
+      Object.entries(hdata.checks || {}).map(([k, v]) =>
+        `<div style="margin:4px 0;">${k}: <b style="color:${v==='ok'?'var(--success)':'var(--warning)'}">${v}</b></div>`
+      ).join('') + `<div style="margin-top:4px;"><b>模式:</b> ${hdata.mode === 'demo' ? '🟡 Demo' : '🟢 完整'}</div>`;
+
+    // 仪表盘数据
+    const res = await fetch(`${API}/dashboard/overview`, {
+      headers: { 'Authorization': 'Bearer demo' }
+    });
+    if (res.ok) {
+      const d = await res.json();
+      document.getElementById('stat-tenants').textContent = d.total_tenants ?? '-';
+      document.getElementById('stat-users').textContent = d.total_users ?? '-';
+      document.getElementById('stat-pets').textContent = d.total_pets ?? '-';
+      document.getElementById('stat-devices').textContent = d.online_devices ?? '-';
+      document.getElementById('stat-tickets').textContent = d.open_tickets ?? '-';
+      document.getElementById('stat-assets').textContent = d.total_assets ?? '-';
+      document.getElementById('stat-device-rate').textContent = '在线率: ' + (d.device_online_rate || 'N/A');
+      document.getElementById('stat-ticket-rate').textContent = '解决率: ' + (d.ticket_resolution_rate || 'N/A');
+    }
+  } catch(e) {
+    document.getElementById('healthInfo').textContent = '加载失败: ' + e.message;
+  }
+}
+
+// ── Agent Chat ────────────────────────────────
+function quickChat(msg) {
+  document.getElementById('chatInput').value = msg;
+  sendMessage();
+}
+
+async function sendMessage() {
+  const input = document.getElementById('chatInput');
+  const msg = input.value.trim();
+  if (!msg) return;
+  input.value = '';
+  input.disabled = true;
+
+  const msgs = document.getElementById('chatMessages');
+  msgs.insertAdjacentHTML('beforeend', `<div class="msg user">${escapeHtml(msg)}</div>`);
+  msgs.insertAdjacentHTML('beforeend', '<div class="msg assistant" id="typingMsg"><div class="typing"><span></span><span></span><span></span></div></div>');
+  msgs.scrollTop = msgs.scrollHeight;
+
+  try {
+    const res = await fetch(`${API}/agent/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: msg, session_id: sessionId })
+    });
+    const data = await res.json();
+    document.getElementById('typingMsg')?.remove();
+
+    const intent = data.intent || 'general';
+    const intentLabel = {health:'🏥 健康',device:'📟 设备',ticket:'🎫 工单',general:'💬 通用'}[intent] || intent;
+    const toolsHtml = data.tool_calls?.length
+      ? `<div style="margin-top:6px;font-size:0.75rem;">🔧 调用了 ${data.tool_calls.length} 个工具: ${data.tool_calls.map(t=>t.tool).join(', ')}</div>`
+      : '';
+
+    msgs.insertAdjacentHTML('beforeend', `
+      <div class="msg assistant">
+        ${escapeHtml(data.reply || data.answer || '（无回复）')}
+        <div class="meta">
+          <span class="intent-tag intent-${intent}">${intentLabel}</span>
+          Agent: ${data.agent_used || data.agent || 'orchestrator'}
+          ${toolsHtml}
+        </div>
+      </div>
+    `);
+  } catch(e) {
+    document.getElementById('typingMsg')?.remove();
+    msgs.insertAdjacentHTML('beforeend', `<div class="msg assistant">❌ 请求失败: ${escapeHtml(e.message)}</div>`);
+  }
+
+  msgs.scrollTop = msgs.scrollHeight;
+  input.disabled = false;
+  input.focus();
+}
+
+// ── RAG Query ─────────────────────────────────
+async function ragQuery() {
+  const question = document.getElementById('ragQuestion').value.trim();
+  if (!question) return alert('请输入问题');
+  const category = document.getElementById('ragCategory').value;
+  const topN = parseInt(document.getElementById('ragTopK').value) || 5;
+
+  const resultDiv = document.getElementById('ragResult');
+  resultDiv.classList.add('show');
+  document.getElementById('ragAnswer').innerHTML = '<div class="typing"><span></span><span></span><span></span></div> 检索中...';
+  document.getElementById('ragSources').textContent = '';
+  document.getElementById('ragBackend').textContent = '';
+
+  try {
+    const res = await fetch(`${API}/rag/query`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question, category: category || null, top_n: topN })
+    });
+    const data = await res.json();
+    document.getElementById('ragAnswer').textContent = data.answer || '无结果';
+    document.getElementById('ragSources').innerHTML = (data.sources || []).map(s =>
+      `<span class="source-tag">📄 ${escapeHtml(s)}</span>`
+    ).join(' ');
+    document.getElementById('ragBackend').textContent =
+      `后端: ${data.backend || 'unknown'} | 检索片段: ${data.chunk_count || 0}`;
+  } catch(e) {
+    document.getElementById('ragAnswer').textContent = '请求失败: ' + e.message;
+  }
+}
+
+// ── MCP Tools ─────────────────────────────────
+async function loadTools() {
+  const grid = document.getElementById('toolGrid');
+  grid.innerHTML = '<div class="loading"></div> 加载工具列表...';
+  try {
+    const res = await fetch(`${API}/agent/tools`);
+    const data = await res.json();
+    const tools = data.tools || [];
+    document.getElementById('mcpCount').textContent = `🔧 ${tools.length} 工具`;
+
+    const cats = {};
+    tools.forEach(t => { if (!cats[t.category]) cats[t.category] = []; cats[t.category].push(t); });
+
+    grid.innerHTML = Object.entries(cats).map(([cat, catTools]) =>
+      `<div style="grid-column:1/-1;margin-top:8px;font-weight:600;color:var(--primary);">${cat.toUpperCase()}</div>` +
+      catTools.map(t => `
+        <div class="tool-card" onclick="testTool('${t.name}', this)">
+          <div class="cat">${t.category}</div>
+          <div class="name">${t.name}</div>
+          <div class="desc">${escapeHtml(t.description || '')}</div>
+          <div class="result"></div>
+        </div>
+      `).join('')
+    ).join('');
+  } catch(e) {
+    grid.innerHTML = '加载失败: ' + e.message;
+  }
+}
+
+async function testTool(name, card) {
+  const resultDiv = card.querySelector('.result');
+  resultDiv.classList.add('show');
+  resultDiv.textContent = '调用中...';
+
+  // 各工具的示例参数
+  const params = {
+    get_device_status: { device_code: 'DEV-001' },
+    list_devices: {},
+    restart_device: { device_code: 'DEV-001' },
+    get_device_alerts: { device_code: 'DEV-001' },
+    get_pet_health_summary: { pet_id: 'pet_001' },
+    analyze_pet_symptoms: { pet_id: 'pet_001', symptoms: '呕吐+精神不振' },
+    get_health_history: { pet_id: 'pet_001' },
+    get_vaccination_record: { pet_id: 'pet_001' },
+    create_ticket: { category: 'device_fault', title: '设备故障', description: '智能项圈无法开机' },
+    get_ticket_status: { ticket_id: 'TK-001' },
+    list_tickets: {},
+    close_ticket: { ticket_id: 'TK-001' },
+    escalate_ticket: { ticket_id: 'TK-001', reason: '紧急处理' },
+    get_member_info: { user_id: 'user_001' },
+    get_member_benefits: { user_id: 'user_001' },
+    check_benefit_eligibility: { user_id: 'user_001', benefit_id: 'BEN-AI-CONSULT' },
+    check_ota_version: { device_code: 'DEV-001' },
+    trigger_ota_upgrade: { device_code: 'DEV-001', target_version: '2.1.0' },
+    get_ota_progress: { task_id: 'OTA-001' },
+  };
+
+  try {
+    const res = await fetch(`${API}/agent/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message: `调用工具 ${name}`,
+        session_id: 'tool_test',
+        // 直接通过 agent chat 来触发工具调用
+        // 实际 Demo 模式中，MCP 工具在 Agent 内部被调用
+      })
+    });
+    const data = await res.json();
+    // 更直接的方式：用 MCP 工具接口
+    resultDiv.textContent = JSON.stringify({
+      tool: name,
+      params: params[name] || {},
+      note: 'Demo 模式 — 工具返回模拟数据',
+      mock: true,
+    }, null, 2);
+  } catch(e) {
+    resultDiv.textContent = 'Error: ' + e.message;
+  }
+}
+
+// ── Helpers ───────────────────────────────────
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+// ── Init ──────────────────────────────────────
+document.getElementById('chatInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') sendMessage();
+});
+
+loadDashboard();
+loadTools();
+fetch(`${API}/agent/tools`).then(r=>r.json()).then(d => {
+  document.getElementById('mcpCount').textContent = `🔧 ${(d.tools||[]).length} 工具`;
+});
+fetch('/health/ready').then(r=>r.json()).then(d => {
+  document.getElementById('modeBadge').textContent =
+    d.mode === 'demo' ? '🟡 Demo 模式' : '🟢 完整模式';
+});
+</script>
+</body>
+</html>

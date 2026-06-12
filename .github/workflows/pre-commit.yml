@@ -1,0 +1,50 @@
+name: pre-commit
+
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+
+permissions: {}
+
+jobs:
+  pre-commit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install linters
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff mypy
+
+      - name: Lint with ruff
+        run: ruff check app/ scripts/ tests/
+        continue-on-error: true
+
+      - name: Format check with ruff
+        run: ruff format --check app/ scripts/ tests/
+
+  pre-commit-alls-green:
+    if: always()
+    needs:
+      - pre-commit
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Decide whether the needed jobs succeeded or failed
+        uses: re-actors/alls-green@v1
+        with:
+          jobs: ${{ toJSON(needs) }}
