@@ -1,0 +1,38 @@
+name: Deploy to Staging
+
+on:
+  push:
+    branches:
+      - master
+      - main
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  deploy:
+    environment: staging
+    runs-on:
+      - self-hosted
+      - staging
+    env:
+      ENVIRONMENT: staging
+      MONGODB_DB_NAME: ${{ secrets.MONGODB_DB_NAME }}
+      JWT_SECRET: ${{ secrets.JWT_SECRET }}
+      SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Build Docker images
+        run: docker compose -f compose.yml build
+
+      - name: Deploy
+        run: docker compose -f compose.yml up -d --wait
+
+      - name: Health check
+        run: |
+          sleep 5
+          curl -f http://localhost:8000/health || exit 1

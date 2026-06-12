@@ -1,0 +1,124 @@
+# CyberLife AI 模型配置
+# 参考 dialog（3）的 prompt.toml 模式
+# 不同场景的 prompt 模板、模型参数、embedding 配置
+
+[model]
+model_name = "deepseek-chat"
+temperature = 0.3
+max_tokens = 2048
+
+[embedding]
+model = "text-embedding-v3"
+dimensions = 1024
+batch_size = 32
+
+# ── 宠物档案分析 ────────────────────────────────────
+[prompts.pet_analysis]
+header = """
+你是一位经验丰富的宠物医生和动物行为专家。
+请基于提供的宠物档案数据，给出专业的分析和建议。
+"""
+
+suggested = """
+以下是与该宠物相关的历史数据供你参考:
+"""
+
+fallback = """
+请根据通用兽医学知识，给出针对该宠物的建议。
+注意标注"以下建议基于通用知识，请咨询执业兽医确认"。
+"""
+
+# ── 宠物命名 ────────────────────────────────────
+[prompts.pet_naming]
+header = """
+你是一位宠物命名专家，擅长根据宠物的品种、外貌特征、性格特点等给出有创意的名字建议。
+"""
+
+suggested = """
+请参考以下命名风格偏好:
+"""
+
+fallback = """
+请给出 5 个有创意的宠物名字，每个附简短解释。
+"""
+
+# ── 健康咨询 ────────────────────────────────────
+[prompts.health_advice]
+header = """
+你是一位兽医顾问，回答宠物健康相关问题。
+请注意：你的建议不应替代专业兽医诊断。
+如果遇到紧急症状（如呼吸困难、持续呕吐、抽搐），必须建议立即就医。
+"""
+
+disclaimer = """
+⚠️ 重要提醒：以下回答由 AI 生成，仅供参考。
+如宠物出现严重症状，请立即联系执业兽医。
+"""
+
+# ── 数据资产标注 ────────────────────────────────────
+[prompts.asset_tagging]
+header = """
+你是一位图像和数据处理专家。
+请根据上传的数据资产（图片/音频/视频）内容，自动生成关键词标签。
+"""
+
+# ── 额外模型端点 ────────────────────────────────────
+# 支持不同场景使用不同模型
+[[endpoint]]
+path = "/ai/pet/analyze"
+model_name = "deepseek-chat"
+model_class_path = "app.integrations.llm_client.get_llm"
+
+[[endpoint]]
+path = "/ai/pet/name"
+model_name = "deepseek-chat"
+model_class_path = "app.integrations.llm_client.get_llm"
+
+# ── A2A 多 Agent 编排配置 ─────────────────────────────────────────
+[agents.orchestrator]
+name = "orchestrator"
+description = "总编排 Agent，负责意图识别和 Sub-Agent 路由"
+model = "deepseek-chat"
+max_iterations = 5
+
+[agents.health]
+name = "health_agent"
+description = "宠物健康分析专家，处理健康咨询/症状分析"
+model = "deepseek-chat"         # 健康咨询需要更强的推理能力
+max_iterations = 5
+tool_categories = ["health"]
+
+[agents.device]
+name = "device_agent"
+description = "IoT 设备运维专家，处理设备状态/故障/OTA"
+model = "deepseek-chat"
+max_iterations = 5
+tool_categories = ["device", "ota"]
+
+[agents.ticket]
+name = "ticket_agent"
+description = "客服工单处理 + 会员权益查询"
+model = "deepseek-chat"
+max_iterations = 3
+tool_categories = ["ticket", "member"]
+
+# ── MCP 工具注册清单（文档用，实际从代码动态注册） ──────────────────
+[mcp.categories]
+device  = ["get_device_status", "send_device_command", "list_devices", "get_device_alerts"]
+ota     = ["get_ota_version", "trigger_ota_upgrade", "get_ota_progress"]
+health  = ["get_pet_health_summary", "analyze_pet_symptoms", "get_health_history", "get_vaccination_record"]
+ticket  = ["create_ticket", "get_ticket_status", "list_tickets", "close_ticket", "escalate_ticket"]
+member  = ["get_member_info", "get_member_benefits", "check_benefit_eligibility"]
+
+# ── RAG 知识库配置 ─────────────────────────────────────────────────
+[rag]
+top_k = 10                  # 初始召回数量
+rerank_top_n = 5            # 重排后保留数量
+score_threshold = 0.6       # 相似度过滤阈值
+reranker_mode = "heuristic" # "heuristic" | "cross_encoder"
+embedding_dim = 1024        # bge-m3 向量维度
+
+[rag.chunking]
+max_tokens = 512
+overlap_tokens = 50
+strategy = "paragraph"      # "paragraph" | "sentence" | "fixed_size"

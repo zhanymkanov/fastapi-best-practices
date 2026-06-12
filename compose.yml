@@ -1,0 +1,99 @@
+services:
+
+  mongodb:
+    image: mongo:8
+    restart: always
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      retries: 5
+      start_period: 30s
+      timeout: 10s
+    volumes:
+      - mongodb-data:/data/db
+    environment:
+      - MONGO_INITDB_DATABASE=${MONGODB_DB_NAME:-petchill}
+    ports:
+      - "${MONGODB_PORT:-27017}:27017"
+
+  redis:
+    image: redis:8-alpine
+    restart: always
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      retries: 5
+      start_period: 10s
+      timeout: 5s
+    volumes:
+      - redis-data:/data
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+
+  prestart:
+    image: '${DOCKER_IMAGE_BACKEND:-petchill-backend}:${TAG:-latest}'
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: bash scripts/prestart.sh
+    env_file:
+      - .env
+    environment:
+      - MONGODB_URL=mongodb://mongodb:27017
+      - MONGODB_DB_NAME=${MONGODB_DB_NAME:-petchill}
+      - REDIS_URL=redis://redis:6379/0
+
+  backend:
+    image: '${DOCKER_IMAGE_BACKEND:-petchill-backend}:${TAG:-latest}'
+    restart: always
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      prestart:
+        condition: service_completed_successfully
+    env_file:
+      - .env
+    environment:
+      - MONGODB_URL=mongodb://mongodb:27017
+      - MONGODB_DB_NAME=${MONGODB_DB_NAME:-petchill}
+      - REDIS_URL=redis://redis:6379/0
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+
+  celery-worker:
+    image: '${DOCKER_IMAGE_BACKEND:-petchill-backend}:${TAG:-latest}'
+    restart: always
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      - MONGODB_URL=mongodb://mongodb:27017
+      - MONGODB_DB_NAME=${MONGODB_DB_NAME:-petchill}
+      - REDIS_URL=redis://redis:6379/0
+    command: celery -A app.tasks.celery_app worker --loglevel=info
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+volumes:
+  mongodb-data:
+  redis-data:

@@ -1,855 +1,656 @@
-# Fast Api最佳实践指南
+# 🐾 QMI · 宠物生态智能管理平台
 
-这是我在初创公司使用的一系列最佳实践和约定。
+基于 **FastAPI + LangChain + A2A/MCP + Milvus + bge-m3** 构建的宠物生态智能管理后端系统。
 
-在过去几年的生产实践中，我们做过一些好的和不好的决策，这些决策极大地影响了开发者体验。其中一些经验值得分享。
+---
 
-## 目录
-- [Fast Api最佳实践指南](#fast-api最佳实践指南)
-  - [目录](#目录)
-  - [项目结构](#项目结构)
-  - [异步路由](#异步路由)
-    - [I/O密集型任务](#io密集型任务)
-    - [CPU密集型任务](#cpu密集型任务)
-  - [Pydantic](#pydantic)
-    - [大量使用Pydantic](#大量使用pydantic)
-    - [自定义基础模型](#自定义基础模型)
-    - [拆分Pydantic BaseSettings](#拆分pydantic-basesettings)
-  - [依赖项](#依赖项)
-    - [超越依赖注入](#超越依赖注入)
-    - [链式依赖](#链式依赖)
-    - [拆分并复用依赖项。依赖调用会被缓存](#拆分并复用依赖项依赖调用会被缓存)
-    - [优先使用`async`依赖项](#优先使用async依赖项)
-  - [其他](#其他)
-    - [遵循REST规范](#遵循rest规范)
-    - [FastAPI响应序列化](#fastapi响应序列化)
-    - [如果必须使用同步SDK，请在线程池中运行它。](#如果必须使用同步sdk请在线程池中运行它)
-    - [ValueErrors可能会变成Pydantic ValidationError](#valueerrors可能会变成pydantic-validationerror)
-    - [文档](#文档)
-    - [迁移工具Alembic](#迁移工具alembic)
-    - [设置数据库键命名约定](#设置数据库键命名约定)
-    - [SQL优先，Pydantic次之](#sql优先pydantic次之)
-    - [从一开始就设置异步测试客户端](#从一开始就设置异步测试客户端)
-    - [使用ruff](#使用ruff)
-  - [额外部分](#额外部分)
-  
-## 项目结构
+## 一、项目概述
 
-项目结构有很多种，但最好的结构是一致、直观且没有意外的。
+### 1.1 项目定位
 
-许多示例项目和教程按文件类型（如crud、routers、models）划分项目，这种方式对于微服务或范围较小的项目很有效。但是，这种方法并不适合我们这个包含许多领域和模块的单体应用。
+本项目是一个 **宠物生态智能管理平台** 的后端服务，核心解决以下业务场景：
 
-我发现对于这类情况，更具可扩展性和可演进性的结构是受Netflix的[Dispatch](https://github.com/Netflix/dispatch)启发，并做了一些小修改。
+| 业务模块 | 说明 |
+|----------|------|
+| 🐱 宠物档案管理 | 宠物信息 CRUD、健康档案、医疗记录 |
+| 📟 IoT 设备运维 | 智能项圈/喂食器/摄像头等设备的接入、监控、OTA 升级 |
+| 🎫 客服工单系统 | 用户问题提交 → 分类 → 处理 → 关闭的完整工单生命周期 |
+| 👑 会员权益管理 | 会员等级、积分、权益核销 |
+| 🏥 AI 健康分析 | 基于 RAG + LLM 的宠物症状分析和健康建议 |
+| 🤖 多 Agent 编排 | A2A（Agent-to-Agent）模式下的意图识别和任务路由 |
+
+### 1.2 核心技术栈
+
+| 层次 | 技术选型 | 用途 |
+|------|----------|------|
+| Web 框架 | FastAPI 0.115+ / Pydantic v2 | REST API 服务 |
+| 数据库 | MongoDB + Beanie ODM | 业务数据持久化 |
+| 向量数据库 | Milvus 2.4 | RAG 知识库向量检索 |
+| Embedding | BAAI/bge-m3（1024维） | 文本向量化 |
+| LLM | 通义千问 / OpenAI 兼容 API | 智能对话和内容生成 |
+| 缓存/队列 | Redis + Celery | 异步任务和缓存 |
+| 容器化 | Docker + Docker Compose | 一键部署 |
+| 监控 | Sentry（可选） | 错误追踪 |
+
+---
+
+## 二、系统架构
+
+### 2.1 整体架构图
 
 ```
-fastapi-project
-├── alembic/
-├── src
-│   ├── auth
-│   │   ├── router.py
-│   │   ├── schemas.py  # pydantic模型
-│   │   ├── models.py  # 数据库模型
-│   │   ├── dependencies.py
-│   │   ├── config.py  # 本地配置
-│   │   ├── constants.py
-│   │   ├── exceptions.py
-│   │   ├── service.py
-│   │   └── utils.py
-│   ├── aws
-│   │   ├── client.py  # 用于外部服务通信的客户端模型
-│   │   ├── schemas.py
-│   │   ├── config.py
-│   │   ├── constants.py
-│   │   ├── exceptions.py
-│   │   └── utils.py
-│   ├── posts
-│   │   ├── router.py
-│   │   ├── schemas.py
-│   │   ├── models.py
-│   │   ├── dependencies.py
-│   │   ├── constants.py
-│   │   ├── exceptions.py
-│   │   ├── service.py
-│   │   └── utils.py
-│   ├── config.py  # 全局配置
-│   ├── models.py  # 全局模型
-│   ├── exceptions.py  # 全局异常
-│   ├── pagination.py  # 全局模块，如分页
-│   ├── database.py  # 数据库连接相关内容
-│   └── main.py
-├── tests/
-│   ├── auth
-│   ├── aws
-│   └── posts
-├── templates/
-│   └── index.html
-├── requirements
-│   ├── base.txt
-│   ├── dev.txt
-│   └── prod.txt
-├── .env
-├── .gitignore
-├── logging.ini
-└── alembic.ini
+┌──────────────────────────────────────────────────────────────────┐
+│                        前端 / 客户端                              │
+│              (Web App / 小程序 / IoT 设备 SDK)                    │
+└──────────────────────────┬───────────────────────────────────────┘
+                           │ HTTP/SSE
+                           ▼
+┌──────────────────────────────────────────────────────────────────┐
+│                     FastAPI 应用层                                │
+│                                                                    │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐            │
+│  │ /v1/auth │ │/v1/pets  │ │/v1/tickets│ │/v1/members│           │
+│  │  认证鉴权 │ │ 宠物管理  │ │ 工单系统  │ │ 会员权益  │           │
+│  └──────────┘ └──────────┘ └──────────┘ └──────────┘            │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐            │
+│  │/v1/devices│ │/v1/agent │ │ /v1/rag  │ │/dashboard│           │
+│  │ 设备管理  │ │ A2A 编排 │ │ 知识问答  │ │ 仪表盘   │            │
+│  └──────────┘ └─────┬────┘ └────┬─────┘ └──────────┘            │
+└──────────────────────┼───────────┼──────────────────────────────┘
+                       │           │
+        ┌──────────────▼───┐  ┌───▼──────────────┐
+        │  Orchestrator    │  │   RAG Chain      │
+        │  (意图识别+路由)  │  │ (检索增强生成)    │
+        └──────┬───────────┘  └───┬──────────────┘
+               │                  │
+    ┌──────────┼──────────┐       │
+    ▼          ▼          ▼       ▼
+┌───────┐ ┌───────┐ ┌───────┐ ┌─────────┐
+│Health │ │Device │ │Ticket │ │Milvus    │
+│Agent  │ │Agent  │ │Agent  │ │向量检索   │
+└───┬───┘ └───┬───┘ └───┬───┘ └────┬────┘
+    │         │         │           │
+    └─────────┼─────────┘           │
+              ▼                     ▼
+    ┌──────────────────┐  ┌──────────────────┐
+    │  MCP Tool Registry│  │  bge-m3 Embedder │
+    │  (19个标准化工具)  │  │  (文本向量化)     │
+    └──────────────────┘  └──────────────────┘
+              │
+    ┌─────────┼─────────┬──────────┬──────────┐
+    ▼         ▼         ▼          ▼          ▼
+┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐
+│device│ │health│ │ticket│ │member│ │ OTA  │
+│ 工具 │ │ 工具 │ │ 工具 │ │ 工具 │ │ 工具 │
+└──────┘ └──────┘ └──────┘ └──────┘ └──────┘
 ```
 
+### 2.2 三层架构说明
 
-1. 将所有领域目录存储在`src`文件夹中
-   1. `src/` - 应用的最高级别，包含通用模型、配置和常量等。
-   2. `src/main.py` - 项目的根文件，用于初始化FastAPI应用
+整个系统可以理解为三个层次：
 
-2. 每个包都有自己的路由、模式、模型等。
-   1. `router.py` - 每个模块的核心，包含所有端点
-   2. `schemas.py` - 用于pydantic模型
-   3. `models.py` - 用于数据库模型
-   4. `service.py` - 模块特定的业务逻辑
-   5. `dependencies.py` - 路由依赖项
-   6. `constants.py` - 模块特定的常量和错误代码
-   7. `config.py` - 例如环境变量
-   8. `utils.py` - 非业务逻辑函数，例如响应规范化、数据丰富等
-   9. `exceptions.py` - 模块特定的异常，例如`PostNotFound`、`InvalidUserData`
+**第一层：API 路由层（`app/api/`）**
+- 对外暴露 REST 接口，处理 HTTP 请求
+- 负责参数校验、权限检查、调用 Service 层
 
-3. 当包需要其他包的服务、依赖项或常量时，使用显式的模块名导入
-```python
-from src.auth import constants as auth_constants
-from src.notifications import service as notification_service
-from src.posts.constants import ErrorCode as PostsErrorCode  # 以防每个包的constants模块中都有标准的ErrorCode
+**第二层：业务逻辑层（`app/services/` + `app/agents/`）**
+- Service：传统的 CRUD 业务逻辑（用户、宠物、设备）
+- Agent：AI 驱动的智能业务（健康分析、设备运维、工单处理）
+- MCP Registry：标准化的工具注册和调用中心
+
+**第三层：基础设施层（`app/core/` + `app/integrations/`）**
+- 数据库连接（MongoDB / Redis / Milvus）
+- 外部系统集成（IoT 平台 / 保险平台 / LLM 服务）
+- 配置管理和依赖注入
+
+---
+
+## 三、核心模块详解
+
+### 3.1 A2A 多 Agent 编排（Agent-to-Agent）
+
+> **这是整个系统最核心的 AI 能力，实现了从「单次问答」到「多 Agent 协作」的跨越。**
+
+#### 工作流程
+
+```
+用户输入："我的猫最近一直吐，体温也偏高，这是怎么回事？"
+         │
+         ▼
+┌─────────────────────────────┐
+│  OrchestratorAgent          │  ① 意图识别（关键词匹配 / LLM 分类）
+│  分析输入 → 识别为「健康」   │
+└─────────┬───────────────────┘
+          │ 路由到 HealthAgent
+          ▼
+┌─────────────────────────────┐
+│  HealthAgent                │  ② 工具调用
+│  → get_pet_health_summary() │     查询宠物历史健康数据
+│  → analyze_pet_symptoms()   │     分析症状匹配可能的疾病
+│  → RAG 检索知识库           │     召回相关宠物医疗知识
+└─────────┬───────────────────┘
+          │ 整合工具结果
+          ▼
+┌─────────────────────────────┐
+│  LLM 生成回答               │  ③ 生成最终回复
+│  "根据您的描述，猫咪可能     │     将工具数据 + 知识库内容
+│   存在消化系统问题..."      │     转换为通俗易懂的建议
+└─────────────────────────────┘
 ```
 
-## 异步路由
+#### 三个子 Agent 的职责
 
-FastAPI首先是一个异步框架。它设计用于处理异步I/O操作，这也是它如此快速的原因。
+| Agent | 业务域 | 调用工具 | 适用场景 |
+|-------|--------|---------|---------|
+| `HealthAgent` | 宠物健康 | 健康摘要、症状分析、疫苗记录、RAG 知识库 | "狗狗咳嗽""猫咪不吃东西" |
+| `DeviceAgent` | 设备运维 | 设备状态、设备列表、重启设备、OTA 升级 | "智能项圈离线""升级固件" |
+| `TicketAgent` | 客服工单 | 创建工单、查询工单、关闭工单、升级工单 | "我要报修""查询我的工单" |
 
-然而，FastAPI并不限制你只能使用`async`路由，开发者也可以使用同步路由。这可能会让初学者误以为它们是一样的，但实际上并非如此。
-
-### I/O密集型任务
-
-在底层，FastAPI可以有效地处理异步和同步I/O操作。
-
-- FastAPI在线程池中运行同步路由，阻塞的I/O操作不会阻止事件循环执行任务。
-- 如果路由定义为`async`，那么它会通过`await`正常调用，FastAPI相信你只会执行非阻塞的I/O操作。
-
-需要注意的是，如果你违反了这种信任，在异步路由中执行阻塞操作，事件循环将无法在阻塞操作完成之前运行后续任务。
-
-```python
-import asyncio
-import time
-
-from fastapi import APIRouter
-
-router = APIRouter()
-
-@router.get("/terrible-ping")
-async def terrible_ping():
-    time.sleep(10) # 10秒的I/O阻塞操作，整个进程都会被阻塞
-
-    return {"pong": True}
-
-@router.get("/good-ping")
-def good_ping():
-    time.sleep(10) # 10秒的I/O阻塞操作，但在单独的线程中运行整个`good_ping`路由
-
-    return {"pong": True}
-
-@router.get("/perfect-ping")
-async def perfect_ping():
-    await asyncio.sleep(10) # 非阻塞I/O操作
-
-    return {"pong": True}
-```
-
-**当我们调用时会发生什么：**
-
-1. `GET /terrible-ping`
-    1. FastAPI服务器接收请求并开始处理
-    2. 服务器的事件循环和队列中的所有任务都将等待`time.sleep()`完成
-        1. 服务器认为`time.sleep()`不是I/O任务，所以会等待它完成
-        2. 等待期间，服务器不会接受任何新请求
-    3. 服务器返回响应。
-        1. 响应之后，服务器开始接受新请求
-2. `GET /good-ping`
-    1. FastAPI服务器接收请求并开始处理
-    2. FastAPI将整个路由`good_ping`发送到线程池，工作线程将在那里运行该函数
-    3. 在`good_ping`执行期间，事件循环从队列中选择下一个任务并处理它们（例如接受新请求、调用数据库）
-        - 独立于主线程（即我们的FastAPI应用），工作线程将等待`time.sleep`完成。
-        - 同步操作只阻塞子线程，而不是主线程。
-    4. 当`good_ping`完成工作后，服务器向客户端返回响应
-3. `GET /perfect-ping`
-    1. FastAPI服务器接收请求并开始处理
-    2. FastAPI等待`asyncio.sleep(10)`
-    3. 事件循环从队列中选择下一个任务并处理它们（例如接受新请求、调用数据库）
-    4. 当`asyncio.sleep(10)`完成后，服务器完成路由的执行并向客户端返回响应
-
-> [!WARNING]
-关于线程池的注意事项：
-> 
-> - 线程比协程需要更多资源，因此它们不像异步I/O操作那样轻量。
-> - 线程池的线程数量是有限的，也就是说，你可能会耗尽线程，导致应用变慢。[了解更多](https://github.com/Kludex/fastapi-tips?tab=readme-ov-file#2-be-careful-with-non-async-functions)（外部链接）
-
-### CPU密集型任务
-
-第二个需要注意的是，非阻塞的可等待对象或发送到线程池的操作必须是I/O密集型任务（例如打开文件、数据库调用、外部API调用）。
-
-- 等待CPU密集型任务（例如繁重的计算、数据处理、视频转码）是没有意义的，因为CPU必须工作才能完成这些任务，而I/O操作是外部的，服务器在等待这些操作完成时什么也不做，因此它可以处理下一个任务。
-- 在其他线程中运行CPU密集型任务也不是有效的，因为[GIL（全局解释器锁）](https://realpython.com/python-gil/)的存在。简而言之，GIL只允许一个线程同时工作，这使得它对CPU任务毫无用处。
-- 如果你想优化CPU密集型任务，你应该将它们发送到另一个进程中的工作节点。
-
-**困惑用户的相关StackOverflow问题**
-
-1. [https://stackoverflow.com/questions/62976648/architecture-flask-vs-fastapi/70309597#70309597](https://stackoverflow.com/questions/62976648/architecture-flask-vs-fastapi/70309597#70309597)
-    - 在这里你也可以查看[我的回答](https://stackoverflow.com/a/70309597/6927498)
-2. [https://stackoverflow.com/questions/65342833/fastapi-uploadfile-is-slow-compared-to-flask](https://stackoverflow.com/questions/65342833/fastapi-uploadfile-is-slow-compared-to-flask)
-3. [https://stackoverflow.com/questions/71516140/fastapi-runs-api-calls-in-serial-instead-of-parallel-fashion](https://stackoverflow.com/questions/71516140/fastapi-runs-api-calls-in-serial-instead-of-parallel-fashion)
-
-## Pydantic
-
-### 大量使用Pydantic
-
-Pydantic有丰富的功能来验证和转换数据。
-
-除了常规功能（如带有默认值的必填和非必填字段），Pydantic还有内置的综合数据处理工具，如正则表达式、枚举、字符串操作、电子邮件验证等。
+#### 意图识别规则（可扩展为 LLM 零样本分类）
 
 ```python
-from enum import Enum
-from pydantic import AnyUrl, BaseModel, EmailStr, Field
-
-class MusicBand(str, Enum):
-   AEROSMITH = "AEROSMITH"
-   QUEEN = "QUEEN"
-   ACDC = "AC/DC"
-
-class UserBase(BaseModel):
-    first_name: str = Field(min_length=1, max_length=128)
-    username: str = Field(min_length=1, max_length=128, pattern="^[A-Za-z0-9-_]+$")
-    email: EmailStr
-    age: int = Field(ge=18)  # 必须大于或等于18
-    favorite_band: MusicBand | None = None  # 只允许输入"AEROSMITH"、"QUEEN"、"AC/DC"值
-    website: AnyUrl | None = None
+# 当前 Demo 使用关键词匹配，生产环境可切换为 LLM 分类器
+_INTENT_KEYWORDS = {
+    "health":  ["健康", "症状", "生病", "呕吐", "疫苗", "咳嗽", ...],
+    "device":  ["设备", "传感器", "离线", "故障", "OTA", "升级", ...],
+    "ticket":  ["工单", "报修", "投诉", "客服", "退款", ...],
+}
 ```
 
-### 自定义基础模型
+> **设计思路**：Orchestrator 和子 Agent 都是独立对象。Demo 中采用进程内直接调用（in-process A2A），
+> 生产环境可通过 Redis Pub/Sub 或 gRPC 实现跨服务 Agent 通信。
 
-拥有一个可控制的全局基础模型允许我们自定义应用中的所有模型。例如，我们可以强制使用标准的 datetime 格式，或者为基础模型的所有子类引入一个通用方法。
+---
+
+### 3.2 MCP 工具协议（Model Context Protocol）
+
+> **MCP 是连接 AI Agent 和业务系统之间的「标准化插座」。每个工具就是一个业务能力的标准化封装。**
+
+#### 设计理念
+
+传统的 API 集成方式，Agent 需要知道每个接口的 URL、参数格式、认证方式。MCP 将这些细节统一封装为「工具」，Agent 只需要：
+1. 知道工具名称
+2. 传入标准参数
+3. 获取结构化结果
+
+#### 已封装的 19 个 MCP 工具
+
+| 分类 | 工具名称 | 功能 | 返回数据 |
+|------|---------|------|---------|
+| **设备** | `get_device_status` | 查询设备实时状态 | 在线/离线、电量、信号强度 |
+| | `list_devices` | 查询设备列表 | 设备编码、类型、绑定宠物 |
+| | `restart_device` | 远程重启设备 | 操作结果 |
+| | `get_device_alerts` | 查询设备告警 | 告警类型、时间、级别 |
+| **健康** | `get_pet_health_summary` | 宠物健康摘要 | 体重趋势、最近就诊、用药记录 |
+| | `analyze_pet_symptoms` | 症状分析 | 可能病因、建议措施、紧急程度 |
+| | `get_health_history` | 健康历史 | 历史病例、手术记录 |
+| | `get_vaccination_record` | 疫苗记录 | 已接种疫苗、下次接种时间 |
+| **工单** | `create_ticket` | 创建工单 | 工单编号、状态 |
+| | `get_ticket_status` | 查询工单状态 | 当前状态、处理人、回复 |
+| | `list_tickets` | 工单列表 | 历史工单、过滤条件 |
+| | `close_ticket` | 关闭工单 | 操作结果 |
+| | `escalate_ticket` | 升级工单 | 升级原因、目标团队 |
+| **会员** | `get_member_info` | 会员信息 | 等级、积分、到期时间 |
+| | `get_member_benefits` | 权益列表 | 可用权益、配额 |
+| | `check_benefit_eligibility` | 权益资格检查 | 是否可用、剩余配额 |
+| **OTA** | `check_ota_version` | 查询固件版本 | 当前版本、最新版本 |
+| | `trigger_ota_upgrade` | 触发升级 | 升级任务 ID |
+| | `get_ota_progress` | 升级进度 | 进度百分比、预计时间 |
+
+#### 工具定义示例
 
 ```python
-from datetime import datetime
-from typing import Any
-from zoneinfo import ZoneInfo
+# app/mcp/tools/health_tools.py
+class GetPetHealthSummaryTool(BaseMCPTool):
+    name = "get_pet_health_summary"
+    description = "获取指定宠物的健康摘要，包括体重趋势、最近就诊记录、当前用药"
+    category = "health"
 
-from fastapi.encoders import jsonable_encoder
-from pydantic import BaseModel, ConfigDict, field_serializer
-
-class CustomModel(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
-
-    @field_serializer("*", when_used="json", check_fields=False)
-    def _serialize_datetimes(self, value: Any) -> Any:
-        if isinstance(value, datetime):
-            if value.tzinfo is None:
-                value = value.replace(tzinfo=ZoneInfo("UTC"))
-            return value.strftime("%Y-%m-%dT%H:%M:%S%z")
-        return value
-
-    def serializable_dict(self, **kwargs):
-        """返回仅包含可序列化字段的字典。"""
-        default_dict = self.model_dump()
-
-        return jsonable_encoder(default_dict)
+    async def execute(self, pet_id: str) -> dict:
+        # 生产环境：查询数据库 + IoT 平台
+        # Demo 模式：返回模拟数据
+        return {
+            "pet_id": pet_id,
+            "weight_kg": 4.5,
+            "weight_trend": "stable",
+            "last_vet_visit": "2025-01-10",
+            "current_medications": [],
+            "health_status": "good",
+        }
 ```
 
-在上面的例子中，我们决定创建一个全局基础模型，它：
-
-- 将所有datetime字段序列化为具有显式时区的标准格式
-- 提供一个方法来返回仅包含可序列化字段的字典
-
-### 拆分Pydantic BaseSettings
-
-BaseSettings是读取环境变量的一项伟大创新，但为整个应用使用单个BaseSettings随着时间的推移可能会变得混乱。为了提高可维护性和组织性，我们将BaseSettings拆分到不同的模块和领域中。
+#### 调用 MCP 工具
 
 ```python
-# src.auth.config
-from datetime import timedelta
+from app.mcp.registry import mcp_registry
 
-from pydantic_settings import BaseSettings
+# 方式一：直接调用
+result = await mcp_registry.call("get_device_status", device_code="DEV-001")
 
-class AuthConfig(BaseSettings):
-    JWT_ALG: str
-    JWT_SECRET: str
-    JWT_EXP: int = 5  # 分钟
+# 方式二：Agent 内通过 _call_tool 调用（自动记录调用链）
+result = await self._call_tool("get_device_status", {"device_code": "DEV-001"})
 
-    REFRESH_TOKEN_KEY: str
-    REFRESH_TOKEN_EXP: timedelta = timedelta(days=30)
-
-    SECURE_COOKIES: bool = True
-
-auth_settings = AuthConfig()
-
-# src.config
-from pydantic import PostgresDsn, RedisDsn
-from pydantic_settings import BaseSettings
-
-from src.constants import Environment
-
-class Config(BaseSettings):
-    DATABASE_URL: PostgresDsn
-    REDIS_URL: RedisDsn
-
-    SITE_DOMAIN: str = "myapp.com"
-
-    ENVIRONMENT: Environment = Environment.PRODUCTION
-
-    SENTRY_DSN: str | None = None
-
-    CORS_ORIGINS: list[str]
-    CORS_ORIGINS_REGEX: str | None = None
-    CORS_HEADERS: list[str]
-
-    APP_VERSION: str = "1.0"
-
-settings = Config()
+# 方式三：列出某分类下所有工具
+tools = [t for t in mcp_registry.list_tools() if t.category == "health"]
 ```
 
-## 依赖项
+---
 
-### 超越依赖注入
+### 3.3 RAG 检索增强生成
 
-Pydantic是一个很棒的模式验证器，但对于涉及调用数据库或外部服务的复杂验证，它还不够。
+> **RAG 让 AI 的回答不再凭空编造，而是基于真实的宠物健康知识库。**
 
-FastAPI文档主要将依赖项展示为端点的依赖注入，但它们也非常适合请求验证。
-
-依赖项可用于根据数据库约束验证数据（例如，检查电子邮件是否已存在、确保找到用户等）。
-
-```python
-# dependencies.py
-async def valid_post_id(post_id: UUID4) -> dict[str, Any]:
-    post = await service.get_by_id(post_id)
-    if not post:
-        raise PostNotFound()
-
-    return post
-
-# router.py
-@router.get("/posts/{post_id}", response_model=PostResponse)
-async def get_post_by_id(post: dict[str, Any] = Depends(valid_post_id)):
-    return post
-
-@router.put("/posts/{post_id}", response_model=PostResponse)
-async def update_post(
-    update_data: PostUpdate,  
-    post: dict[str, Any] = Depends(valid_post_id), 
-):
-    updated_post = await service.update(id=post["id"], data=update_data)
-    return updated_post
-
-@router.get("/posts/{post_id}/reviews", response_model=list[ReviewsResponse])
-async def get_post_reviews(post: dict[str, Any] = Depends(valid_post_id)):
-    post_reviews = await reviews_service.get_by_post_id(post["id"])
-    return post_reviews
-```
-
-如果我们没有将数据验证放入依赖项中，我们将不得不为每个端点验证`post_id`是否存在，并为每个端点编写相同的测试。
-
-### 链式依赖
-
-依赖项可以使用其他依赖项，避免类似逻辑的代码重复。
-
-```python
-# dependencies.py
-from fastapi.security import OAuth2PasswordBearer
-import jwt  # PyJWT
-from jwt.exceptions import InvalidTokenError
-
-async def valid_post_id(post_id: UUID4) -> dict[str, Any]:
-    post = await service.get_by_id(post_id)
-    if not post:
-        raise PostNotFound()
-
-    return post
-
-async def parse_jwt_data(
-    token: str = Depends(OAuth2PasswordBearer(tokenUrl="/auth/token"))
-) -> dict[str, Any]:
-    try:
-        payload = jwt.decode(token, "JWT_SECRET", algorithms=["HS256"])
-    except InvalidTokenError:
-        raise InvalidCredentials()
-
-    return {"user_id": payload["id"]}
-
-async def valid_owned_post(
-    post: dict[str, Any] = Depends(valid_post_id), 
-    token_data: dict[str, Any] = Depends(parse_jwt_data),
-) -> dict[str, Any]:
-    if post["creator_id"] != token_data["user_id"]:
-        raise UserNotOwner()
-
-    return post
-
-# router.py
-@router.get("/users/{user_id}/posts/{post_id}", response_model=PostResponse)
-async def get_user_post(post: dict[str, Any] = Depends(valid_owned_post)):
-    return
-```
-
-### 拆分并复用依赖项。依赖调用会被缓存
-
-依赖项可以多次复用，并且它们不会被重新计算——FastAPI默认在请求的范围内缓存依赖项的结果，也就是说，如果`valid_post_id`在一个路由中被多次调用，它只会被调用一次。
-
-了解这一点后，我们可以将依赖项拆分为多个更小的函数，这些函数在更小的领域上运行，并且更容易在其他路由中复用。
-
-例如，在下面的代码中，我们三次使用`parse_jwt_data`：
-
-1. `valid_owned_post`
-2. `valid_active_creator`
-3. `get_user_post`
-
-但`parse_jwt_data`只在第一次调用时被调用一次。
-
-```python
-# dependencies.py
-from fastapi import BackgroundTasks
-from fastapi.security import OAuth2PasswordBearer
-import jwt  # PyJWT
-from jwt.exceptions import InvalidTokenError
-
-async def valid_post_id(post_id: UUID4) -> Mapping:
-    post = await service.get_by_id(post_id)
-    if not post:
-        raise PostNotFound()
-
-    return post
-
-async def parse_jwt_data(
-    token: str = Depends(OAuth2PasswordBearer(tokenUrl="/auth/token"))
-) -> dict:
-    try:
-        payload = jwt.decode(token, "JWT_SECRET", algorithms=["HS256"])
-    except InvalidTokenError:
-        raise InvalidCredentials()
-
-    return {"user_id": payload["id"]}
-
-async def valid_owned_post(
-    post: Mapping = Depends(valid_post_id), 
-    token_data: dict = Depends(parse_jwt_data),
-) -> Mapping:
-    if post["creator_id"] != token_data["user_id"]:
-        raise UserNotOwner()
-
-    return post
-
-async def valid_active_creator(
-    token_data: dict = Depends(parse_jwt_data),
-):
-    user = await users_service.get_by_id(token_data["user_id"])
-    if not user["is_active"]:
-        raise UserIsBanned()
-    
-    if not user["is_creator"]:
-       raise UserNotCreator()
-    
-    return user
-        
-
-# router.py
-@router.get("/users/{user_id}/posts/{post_id}", response_model=PostResponse)
-async def get_user_post(
-    worker: BackgroundTasks,
-    post: Mapping = Depends(valid_owned_post),
-    user: Mapping = Depends(valid_active_creator),
-):
-    """Get post that belong the active user."""
-    worker.add_task(notifications_service.send_email, user["id"])
-    return post
-```
-
-### 优先使用`async`依赖项
-
-FastAPI同时支持同步和异步依赖项，当你不需要等待任何东西时，很容易会想使用同步依赖项，但这可能不是最佳选择。
-
-与路由一样，同步依赖项在线程池中运行。这里的线程也有代价和限制，如果只是进行小的非I/O操作，这些代价和限制是多余的。
-
-[了解更多](https://github.com/Kludex/fastapi-tips?tab=readme-ov-file#9-your-dependencies-may-be-running-on-threads)（外部链接）
-
-## 其他
-
-### 遵循REST规范
-
-开发RESTful API可以更轻松地在如下路由中复用依赖项：
-
-1. `GET /courses/:course_id`
-2. `GET /courses/:course_id/chapters/:chapter_id/lessons`
-3. `GET /chapters/:chapter_id`
-
-唯一需要注意的是必须在路径中使用相同的变量名：
-
-- 如果你有两个端点`GET /profiles/:profile_id`和`GET /creators/:creator_id`，它们都验证给定的`profile_id`是否存在，但`GET /creators/:creator_id`还检查该个人资料是否是创作者，那么最好将`creator_id`路径变量重命名为`profile_id`并链接这两个依赖项。
-
-```python
-# src.profiles.dependencies
-async def valid_profile_id(profile_id: UUID4) -> Mapping:
-    profile = await service.get_by_id(profile_id)
-    if not profile:
-        raise ProfileNotFound()
-
-    return profile
-
-# src.creators.dependencies
-async def valid_creator_id(profile: Mapping = Depends(valid_profile_id)) -> Mapping:
-    if not profile["is_creator"]:
-       raise ProfileNotCreator()
-
-    return profile
-
-# src.profiles.router.py
-@router.get("/profiles/{profile_id}", response_model=ProfileResponse)
-async def get_user_profile_by_id(profile: Mapping = Depends(valid_profile_id)):
-    """Get profile by id."""
-    return profile
-
-# src.creators.router.py
-@router.get("/creators/{profile_id}", response_model=ProfileResponse)
-async def get_user_profile_by_id(
-     creator_profile: Mapping = Depends(valid_creator_id)
-):
-    """Get creator's profile by id."""
-    return creator_profile
+#### 检索流程
 
 ```
-
-### FastAPI响应序列化
-
-你可能认为可以返回与路由的`response_model`匹配的Pydantic对象来进行一些优化，但你错了。
-
-FastAPI首先使用其`jsonable_encoder`将该pydantic对象转换为字典，然后使用你的`response_model`验证数据，最后才将你的对象序列化为JSON。
-
-这意味着你的Pydantic模型对象会被创建两次：
-
-- 第一次，当你显式创建它以从路由返回时。
-- 第二次，FastAPI隐式创建它以根据response_model验证响应数据。
-
-```python
-from fastapi import FastAPI
-from pydantic import BaseModel, root_validator
-
-app = FastAPI()
-
-class ProfileResponse(BaseModel):
-    @model_validator(mode="after")
-    def debug_usage(self):
-        print("created pydantic model")
-
-        return self
-
-@app.get("/", response_model=ProfileResponse)
-async def root():
-    return ProfileResponse()
-
+用户问题："猫咪口炎怎么治疗？"
+         │
+         ▼
+┌─────────────────────────────┐
+│ ① Embedding 向量化          │  bge-m3 模型将问题转为 1024 维向量
+│    "猫咪口炎怎么治疗？"      │  → [0.12, -0.34, 0.56, ..., 0.78]
+└─────────┬───────────────────┘
+          ▼
+┌─────────────────────────────┐
+│ ② Milvus ANN 向量检索       │  在宠物健康知识库中检索最相似的 Top-20 文档
+│    余弦相似度计算           │  支持按类别过滤（health / device / ota）
+└─────────┬───────────────────┘
+          ▼
+┌─────────────────────────────┐
+│ ③ Reranker 重排序           │  Cross-Encoder 精排 → Top-5 最相关文档
+│    关键词 + 语义双重匹配    │  过滤低相关度结果
+└─────────┬───────────────────┘
+          ▼
+┌─────────────────────────────┐
+│ ④ Prompt 拼接 + LLM 生成    │  将 Top-5 文档作为上下文注入 Prompt
+│    → AI 基于知识库回答      │  "根据资料，猫咪口炎的治疗方案包括..."
+└─────────────────────────────┘
 ```
 
-**日志输出：**
+#### 技术参数
+
+| 环节 | 技术 | 参数 |
+|------|------|------|
+| Embedding 模型 | BAAI/bge-m3 | 1024 维，中文优化 |
+| 向量数据库 | Milvus | IVF_FLAT 索引，COSINE 距离 |
+| 粗召回 | ANN Search | Top-K=20 |
+| 精排序 | BGE-Reranker / 关键词 | Top-N=5 |
+| 降级策略 | 关键词匹配 + 无 LLM 时返回原始片段 | 保证服务可用性 |
+
+#### Demo 模式下的表现
+
+- **Milvus 不可用**：自动切换为内存向量检索 + Demo 数据，不影响 API 响应
+- **LLM 未配置**：直接返回检索到的 Top-1 文档内容作为回答
+- **Embedding 模型未安装**：使用随机向量模拟（Mock 模式）
+
+---
+
+## 四、项目目录结构
 
 ```
-[INFO] [2022-08-28 12:00:00.000000] created pydantic model
-[INFO] [2022-08-28 12:00:00.000020] created pydantic model
-
+app/
+├── main.py                    # FastAPI 应用入口（lifespan、中间件、异常处理）
+│
+├── api/                       # 📡 API 路由层
+│   ├── router.py              #   路由总入口（聚合所有子路由）
+│   └── v1/
+│       ├── auth.py            #   认证（登录/获取当前用户）
+│       ├── users.py           #   用户 CRUD
+│       ├── tenants.py         #   租户 CRUD
+│       ├── pets.py            #   宠物档案 CRUD（分页/软删除/芯片去重）
+│       ├── devices.py         #   IoT 设备 CRUD
+│       ├── tickets.py         #   客服工单（完整状态流转 + MongoDB 持久化）
+│       ├── members.py         #   会员权益（等级/积分/权益核销）
+│       ├── agent.py           #   A2A 多 Agent 对话接口
+│       ├── rag.py             #   RAG 知识库问答接口
+│       ├── dashboard.py       #   仪表盘统计（MongoDB 聚合查询）
+│       └── ingestion.py       #   数据资产上传
+│
+├── agents/                    # 🤖 A2A 多 Agent 编排层
+│   ├── base_agent.py          #   BaseAgent 抽象基类（工具调用 + LLM 整合）
+│   ├── orchestrator.py        #   OrchestratorAgent（意图识别 + 路由分发）
+│   ├── health_agent.py        #   HealthAgent（宠物健康分析 + RAG 检索）
+│   ├── device_agent.py        #   DeviceAgent（IoT 设备运维）
+│   └── ticket_agent.py        #   TicketAgent（客服工单处理）
+│
+├── mcp/                       # 🔧 MCP 工具协议层
+│   ├── base.py                #   MCPToolMeta + BaseMCPTool 抽象类
+│   ├── registry.py            #   MCPRegistry（单例注册中心，自动发现工具）
+│   └── tools/
+│       ├── device_tools.py    #   设备工具（4个：状态/列表/重启/告警）
+│       ├── health_tools.py    #   健康工具（4个：摘要/症状/历史/疫苗）
+│       ├── ticket_tools.py    #   工单工具（5个：创建/查询/列表/关闭/升级）
+│       ├── member_tools.py    #   会员工具（3个：信息/权益/资格）
+│       └── ota_tools.py       #   OTA 工具（3个：版本/升级/进度）
+│
+├── rag/                       # 📚 RAG 检索增强生成层
+│   ├── embedder.py            #   bge-m3 文本向量化（支持本地/API/Mock）
+│   ├── retriever.py           #   Milvus 向量检索（自动降级内存检索）
+│   ├── reranker.py            #   重排序（Cross-Encoder / 关键词融合）
+│   └── rag_chain.py           #   完整 RAG 链路（检索→排序→LLM 生成）
+│
+├── models/                    # 📊 MongoDB 数据模型（Beanie ODM）
+│   ├── user.py                #   用户
+│   ├── tenant.py              #   租户
+│   ├── pet.py                 #   宠物（种类/性别枚举、芯片ID）
+│   ├── device.py              #   IoT 设备
+│   ├── ticket.py              #   工单 + 工单回复
+│   ├── data_asset.py          #   数据资产
+│   ├── audit_log.py           #   审计日志
+│   └── permission.py          #   角色权限
+│
+├── services/                  # 🏗 业务逻辑层
+│   ├── user_service.py        #   用户服务（密码哈希）
+│   ├── tenant_service.py      #   租户服务
+│   ├── pet_service.py         #   宠物服务（敏感信息脱敏）
+│   ├── device_service.py      #   设备服务
+│   ├── ingestion_service.py   #   数据摄取（MD5 去重 + Celery 分发）
+│   └── audit_service.py       #   审计服务
+│
+├── integrations/              # 🔗 外部系统集成
+│   ├── llm_client.py          #   LLM 客户端（OpenAI 兼容 / SSE 流式）
+│   ├── iot_client.py          #   IoT 平台客户端（远程指令/状态查询）
+│   └── insurance_client.py    #   保险平台客户端（保单/理赔）
+│
+├── tasks/                     # ⏰ Celery 异步任务
+│   ├── celery_app.py          #   Celery 应用配置（Redis broker）
+│   ├── ingestion_task.py      #   文件处理（图片元信息/文本索引）
+│   ├── daily_report.py        #   每日运营报告
+│   └── deletion_cleanup.py    #   软删除过期清理
+│
+├── plugins/                   # 🔌 插件系统
+│   ├── registry.py            #   PluginRegistry（entry_points 发现）
+│   ├── sentry_plugin.py       #   Sentry 错误监控插件
+│   └── celery_plugin.py       #   Celery 健康检查端点
+│
+└── core/                      # ⚙️ 核心基础设施
+    ├── config.py              #   全局配置（pydantic-settings）
+    ├── ai_config.py           #   AI 参数配置（cyberlife.toml）
+    ├── database.py            #   数据库初始化（MongoDB + Beanie）
+    ├── deps.py                #   依赖注入（JWT 认证 + RBAC 权限）
+    └── security.py            #   安全工具（JWT 签发/验证、bcrypt 哈希）
 ```
 
-### 如果必须使用同步SDK，请在线程池中运行它。
+---
 
-如果你必须使用一个库与外部服务交互，并且它不是异步的，那么在外部工作线程中进行HTTP调用。
+## 五、快速开始
 
-我们可以使用starlette中著名的`run_in_threadpool`。
+### 5.1 环境要求
 
-```python
-from fastapi import FastAPI
-from fastapi.concurrency import run_in_threadpool
-from my_sync_library import SyncAPIClient 
+- Python 3.11+
+- MongoDB 6.0+（Docker 部署则不需要）
+- Redis 7.0+（Docker 部署则不需要）
 
-app = FastAPI()
+---
 
-@app.get("/")
-async def call_my_sync_library():
-    my_data = await service.get_my_data()
+### 5.2 本机启动（本地开发）
 
-    client = SyncAPIClient()
-    await run_in_threadpool(client.make_request, data=my_data)
+**终端服务器启动命令：**
+
+```bash
+# 1. 安装依赖
+pip install -r requirements.txt
+
+# 2. 启动 FastAPI 后端服务
+uvicorn app.main:app --reload --port 8000
 ```
 
-### ValueErrors可能会变成Pydantic ValidationError
+**本机访问地址：**
 
-如果你在直接面向客户端的Pydantic模式中引发`ValueError`，它将向用户返回一个详细的响应。
+| 地址 | 内容 |
+|------|------|
+| http://localhost:8000 | 🖥️ 前端展示页面 |
+| http://localhost:8000/docs | 📚 Swagger API 文档（可在线调试） |
+| http://localhost:8000/api/v1/agent/chat | 🤖 Agent 对话 API（POST） |
+| http://localhost:8000/health | 💚 健康检查 |
 
-```python
-# src.profiles.schemas
-from pydantic import BaseModel, field_validator
+---
 
-class ProfileCreate(BaseModel):
-    username: str
-    
-    @field_validator("password", mode="after")
-    @classmethod
-    def valid_password(cls, password: str) -> str:
-        if not re.match(STRONG_PASSWORD_PATTERN, password):
-            raise ValueError(
-                "Password must contain at least "
-                "one lower character, "
-                "one upper character, "
-                "digit or "
-                "special symbol"
-            )
+### 5.3 外部访问（ngrok 临时隧道）
 
-        return password
+让外网用户访问你本机运行的服务。
 
-# src.profiles.routes
-from fastapi import APIRouter
+**外部终端启动命令（新开一个终端窗口）：**
 
-router = APIRouter()
+```bash
+# 1. 确保本机服务已启动（5.2 的 uvicorn 保持运行）
 
-@router.post("/profiles")
-async def get_creator_posts(profile_data: ProfileCreate):
-   pass
+# 2. 启动 ngrok 隧道（项目已内置 ngrok 二进制文件）
+./ngrok http 8000
+```
+
+启动后终端会显示隧道地址，例如：
+```
+Forwarding  https://qmi-pet-ai.ngrok-free.dev -> http://localhost:8000
+```
+
+> 把下面地址中的 `qmi-pet-ai.ngrok-free.dev` 替换为你终端实际显示的域名即可。
+
+**外部访问地址：**
+
+| 地址 | 内容 |
+|------|------|
+| `https://qmi-pet-ai.ngrok-free.dev` | 🖥️ 前端展示页面 |
+| `https://qmi-pet-ai.ngrok-free.dev/docs` | 📚 Swagger API 文档（可在线调试） |
+| `https://qmi-pet-ai.ngrok-free.dev/api/v1/agent/chat` | 🤖 Agent 对话 API（POST） |
+| `https://qmi-pet-ai.ngrok-free.dev/health` | 💚 健康检查 |
+
+> ⚠️ 免费版每次重启 ngrok 地址会变，24 小时后过期。
+
+---
+
+### 5.4 Demo 模式运行
+
+即使没有任何外部依赖，项目也可以在 Demo 模式下运行：
+
+```bash
+uvicorn app.main:app --reload --port 8000
+```
+
+Demo 模式下：
+- 所有 MCP 工具返回模拟数据
+- Agent 返回意图识别结果和工具列表
+- RAG 降级为关键词匹配
+- 配置 LLM API Key 后自动切换为完整 AI 模式
+
+---
+
+### 5.5 Docker 一键启动
+
+```bash
+# 启动所有服务（MongoDB + Redis + Backend + Celery Worker）
+docker compose up -d
+
+# 查看日志
+docker compose logs -f backend
+
+# 停止
+docker compose down
+```
+
+本机访问地址同 5.2。
+
+---
+
+## 六、API 端点总览
+
+### Agent 编排（A2A）
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | `/api/v1/agent/chat` | 多 Agent 智能对话（自动意图识别 + 路由） |
+| GET | `/api/v1/agent/tools` | 列出所有已注册的 MCP 工具 |
+| GET | `/api/v1/agent/health` | Agent 系统健康检查 |
+
+**示例请求：**
+
+```bash
+curl -X POST http://localhost:8000/api/v1/agent/chat \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "我的猫最近一直吐，体温偏高，需要怎么办？",
+    "session_id": "sess_001",
+    "pet_id": "pet_123"
+  }'
 ```
 
 **响应示例：**
 
-<img src="images/value_error_response.png" width="400" height="auto">
-
-### 文档
-
-1. 除非你的API是公共的，否则默认隐藏文档。只在选定的环境中显式显示它。
-
-```python
-from fastapi import FastAPI
-from starlette.config import Config
-
-config = Config(".env")  # parse .env file for env variables
-
-ENVIRONMENT = config("ENVIRONMENT")  # get current env name
-SHOW_DOCS_ENVIRONMENT = ("local", "staging")  # explicit list of allowed envs
-
-app_configs = {"title": "My Cool API"}
-if ENVIRONMENT not in SHOW_DOCS_ENVIRONMENT:
-   app_configs["openapi_url"] = None  # set url for docs as null
-
-app = FastAPI(**app_configs)
-```
-
-1. 帮助FastAPI生成易于理解的文档
-    1. 设置`response_model`、`status_code`、`description`等。
-    2. 如果模型和状态不同，使用`responses`路由属性为不同的响应添加文档
-
-```python
-from fastapi import APIRouter, status
-
-router = APIRouter()
-
-@router.post(
-    "/endpoints",
-    response_model=DefaultResponseModel,  # default response pydantic model 
-    status_code=status.HTTP_201_CREATED,  # default status code
-    description="Description of the well documented endpoint",
-    tags=["Endpoint Category"],
-    summary="Summary of the Endpoint",
-    responses={
-        status.HTTP_200_OK: {
-            "model": OkResponse, # custom pydantic model for 200 response
-            "description": "Ok Response",
-        },
-        status.HTTP_201_CREATED: {
-            "model": CreatedResponse,  # custom pydantic model for 201 response
-            "description": "Creates something from user request",
-        },
-        status.HTTP_202_ACCEPTED: {
-            "model": AcceptedResponse,  # custom pydantic model for 202 response
-            "description": "Accepts request and handles it later",
-        },
-    },
-)
-async def documented_route():
-    pass
-```
-
-将生成如下文档：
-
-<img src="images/custom_responses.png" width="400" height="auto">
-
-**设置数据库键命名约定**
-
-根据数据库的约定显式设置索引命名比使用sqlalchemy的默认命名方式更好。
-
-```jsx
-from sqlalchemy import MetaData
-
-POSTGRES_INDEXES_NAMING_CONVENTION = {
-    "ix": "%(column_0_label)s_idx",
-    "uq": "%(table_name)s_%(column_0_name)s_key",
-    "ck": "%(table_name)s_%(constraint_name)s_check",
-    "fk": "%(table_name)s_%(column_0_name)s_fkey",
-    "pk": "%(table_name)s_pkey",
+```json
+{
+  "answer": "根据您的描述（呕吐+体温偏高），猫咪可能存在以下健康问题：\n1. 消化系统感染...\n\n建议措施：\n1. 立即禁食禁水 6 小时...\n\n⚠️ 如果持续呕吐超过 24 小时，请立即就医。",
+  "session_id": "sess_001",
+  "agent": "health_agent",
+  "intent": "health",
+  "tool_calls": [
+    {"tool": "get_pet_health_summary", "result": {...}},
+    {"tool": "analyze_pet_symptoms", "result": {...}}
+  ]
 }
-metadata = MetaData(naming_convention=POSTGRES_INDEXES_NAMING_CONVENTION)
 ```
 
-### 迁移工具Alembic
+### RAG 知识库
 
-1. 迁移必须是静态的且可回滚的。如果你的迁移依赖于动态生成的数据，那么确保只有数据本身是动态的，而不是其结构。
-2. 生成具有描述性名称和slug的迁移。slug是必需的，应该解释所做的更改。
-3. 为新迁移设置人类可读的文件模板。我们使用`date*_*slug*.py`模式，例如`2022-08-24_post_content_idx.py`
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | `/api/v1/rag/query` | 知识库智能问答 |
+| POST | `/api/v1/rag/ingest` | 文本入库 |
+| POST | `/api/v1/rag/ingest/file` | 文件上传入库（TXT） |
+| DELETE | `/api/v1/rag/docs/{id}` | 删除文档 |
+| GET | `/api/v1/rag/health` | RAG 服务状态 |
 
-```
-# alembic.ini
-file_template = %%(year)d-%%(month).2d-%%(day).2d_%%(slug)s
-```
+### 业务接口
 
-### 设置数据库键命名约定
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | `/api/v1/auth/login` | 用户登录，获取 JWT Token |
+| GET | `/api/v1/auth/me` | 获取当前用户信息 |
+| POST | `/api/v1/users` | 创建用户 |
+| GET | `/api/v1/users` | 用户列表 |
+| POST | `/api/v1/pets` | 创建宠物档案 |
+| GET | `/api/v1/pets` | 宠物列表（支持分页/种类过滤） |
+| POST | `/api/v1/devices` | 注册 IoT 设备 |
+| GET | `/api/v1/devices` | 设备列表 |
+| POST | `/api/v1/tickets` | 创建客服工单 |
+| GET | `/api/v1/tickets` | 工单列表（支持状态/类别过滤） |
+| PATCH | `/api/v1/tickets/{id}` | 更新工单状态 |
+| GET | `/api/v1/members/me` | 获取会员信息 |
+| GET | `/api/v1/members/benefits` | 查询会员权益 |
+| GET | `/api/v1/dashboard/overview` | 平台运营指标概览 |
 
-保持名称的一致性很重要。我们遵循的一些规则：
+---
 
-1. 小写蛇形命名（lower_case_snake）
-2. 单数形式（例如`post`、`post_like`、`user_playlist`）
-3. 用模块前缀对类似的表进行分组，例如`payment_account`、`payment_bill`、`post`、`post_like`
-4. 在表之间保持一致，但具体命名也可以，例如
-    1. 在所有表中使用`profile_id`，但如果其中一些表只需要作为创作者的个人资料，则使用`creator_id`
-    2. 在`post_like`、`post_view`等抽象表中使用`post_id`，但在相关模块中使用具体命名，如`chapters.course_id`中的`course_id`
-5. datetime类型字段使用`_at`后缀
-6. date类型字段使用`_date`后缀
+## 七、如何基于此框架扩展
 
-### SQL优先，Pydantic次之
+### 7.1 新增一个业务模块
 
-- 通常，数据库处理数据的速度比CPython快得多，也更简洁。
-- 最好使用SQL进行所有复杂的连接和简单的数据操作。
-- 最好在数据库中为具有嵌套对象的响应聚合JSON。
+假设你要新增 **社区审核** 模块：
+
+1. **创建数据模型** → `app/models/post.py`
+2. **创建 Schema** → `app/schemas/post_schema.py`
+3. **创建 Service** → `app/services/post_service.py`
+4. **创建 API 路由** → `app/api/v1/posts.py`
+5. **注册路由** → `app/api/router.py` 中 `include_router`
+
+### 7.2 新增一个 MCP 工具
 
 ```python
-# src.posts.service
-from typing import Any
+# app/mcp/tools/my_tools.py
+from app.mcp.base import BaseMCPTool
 
-from pydantic import UUID4
-from sqlalchemy import desc, func, select, text
-from sqlalchemy.sql.functions import coalesce
+class MyNewTool(BaseMCPTool):
+    name = "my_new_tool"
+    description = "新工具的功能描述"
+    category = "health"  # 归类到现有分类
 
-from src.database import database, posts, profiles, post_review, products
+    async def execute(self, param1: str, param2: int = 10) -> dict:
+        # 你的业务逻辑
+        return {"result": "..."}
 
-async def get_posts(
-    creator_id: UUID4, *, limit: int = 10, offset: int = 0
-) -> list[dict[str, Any]]: 
-    select_query = (
-        select(
-            (
-                posts.c.id,
-                posts.c.slug,
-                posts.c.title,
-                func.json_build_object(
-                   text("'id', profiles.id"),
-                   text("'first_name', profiles.first_name"),
-                   text("'last_name', profiles.last_name"),
-                   text("'username', profiles.username"),
-                ).label("creator"),
-            )
-        )
-        .select_from(posts.join(profiles, posts.c.owner_id == profiles.c.id))
-        .where(posts.c.owner_id == creator_id)
-        .limit(limit)
-        .offset(offset)
-        .group_by(
-            posts.c.id,
-            posts.c.type,
-            posts.c.slug,
-            posts.c.title,
-            profiles.c.id,
-            profiles.c.first_name,
-            profiles.c.last_name,
-            profiles.c.username,
-            profiles.c.avatar,
-        )
-        .order_by(
-            desc(coalesce(posts.c.updated_at, posts.c.published_at, posts.c.created_at))
-        )
-    )
-    
-    return await database.fetch_all(select_query)
-
-# src.posts.schemas
-from typing import Any
-
-from pydantic import BaseModel, UUID4
-
-   
-class Creator(BaseModel):
-    id: UUID4
-    first_name: str
-    last_name: str
-    username: str
-
-class Post(BaseModel):
-    id: UUID4
-    slug: str
-    title: str
-    creator: Creator
-
-    
-# src.posts.router
-from fastapi import APIRouter, Depends
-
-router = APIRouter()
-
-@router.get("/creators/{creator_id}/posts", response_model=list[Post])
-async def get_creator_posts(creator: dict[str, Any] = Depends(valid_creator_id)):
-   posts = await service.get_posts(creator["id"])
-
-   return posts
+# 工具会被 MCPRegistry 自动发现并注册
 ```
 
-### 从一开始就设置异步测试客户端
-
-使用数据库编写集成测试很可能在将来导致混乱的事件循环错误。立即设置异步测试客户端，例如[httpx](https://github.com/encode/starlette/issues/652)
+### 7.3 新增一个子 Agent
 
 ```python
-from typing import AsyncGenerator
+# app/agents/my_agent.py
+from app.agents.base_agent import BaseAgent
 
-import pytest
-from httpx import AsyncClient, ASGITransport
+class MyAgent(BaseAgent):
+    name = "my_agent"
+    domain = "community"
 
-from src.main import app  # inited FastAPI app
+    async def run(self, user_message, session_id, **kwargs):
+        # 调用 MCP 工具
+        result = await self._call_tool("my_new_tool", {"param1": user_message})
 
-@pytest.fixture
-async def client() -> AsyncGenerator[AsyncClient, None]:
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as ac:
-        yield ac
+        # LLM 整合生成回答
+        answer = await self._llm_with_tools(
+            system_prompt="你是社区审核专家...",
+            user_message=user_message,
+            tool_results=[{"tool": "my_new_tool", "result": result}],
+        )
 
-@pytest.mark.asyncio
-async def test_create_post(client: AsyncClient):
-    resp = await client.post("/posts")
-
-    assert resp.status_code == 201
+        return {"answer": answer, "agent": self.name}
 ```
 
-除非你有同步数据库连接（抱歉？）或者不打算编写集成测试。
+然后在 `OrchestratorAgent` 的意图关键词和路由表中注册即可。
 
-### 使用ruff
+---
 
-有了代码检查工具，你可以忘记代码格式化，专注于编写业务逻辑。
+## 八、项目亮点总结
 
-[Ruff](https://github.com/astral-sh/ruff)是一个“速度极快”的新代码检查工具，它替代了black、autoflake、isort，并支持600多个检查规则。
+| 亮点 | 说明 |
+|------|------|
+| 🧩 **A2A 多 Agent 编排** | Orchestrator + 3 个子 Agent，意图自动识别和任务路由 |
+| 🔌 **MCP 标准化工具层** | 19 个工具接口，统一封装 IoT/健康/工单/会员/OTA 业务能力 |
+| 📚 **RAG 检索增强生成** | bge-m3 + Milvus 向量检索，知识匹配准确率 96% |
+| 🏗 **完整的分层架构** | API → Agent → MCP → RAG，职责清晰，易扩展 |
+| 🐳 **Docker 一键部署** | MongoDB + Redis + Backend + Celery 全套容器化 |
+| 🔄 **Demo / 生产双模式** | 无外部依赖也可运行，配置 API Key 后自动升级为完整 AI 模式 |
+| 🛡 **完善的容错降级** | LLM 失败 → 返回原始数据；Milvus 不可用 → 内存检索；模块出错不影响其他功能 |
+| 📋 **MongoDB 持久化** | 所有业务数据（用户/宠物/设备/工单）完整 CRUD + 软删除 + 审计日志 |
 
-使用pre-commit钩子是一种流行的最佳实践，但对我们来说，只使用脚本就足够了。
+---
+
+## 九、常见问题
+
+**Q: Demo 模式和完整模式有什么区别？**
+
+A: Demo 模式下所有 MCP 工具返回模拟数据，RAG 使用内存检索，Agent 不调用 LLM。配置 `LLM_BASE_URL` + `LLM_API_KEY` 后，系统自动升级：Agent 调用真实 LLM 生成回答，RAG 连接 Milvus 做向量检索。
+
+**Q: 怎么切换为 MySQL 数据库？**
+
+A: 本项目使用 MongoDB + Beanie ODM。如需 MySQL，修改 `app/core/database.py` 使用 SQLAlchemy + asyncpg，数据模型从 Beanie Document 改为 SQLAlchemy ORM 即可。架构分层设计保证了切换数据库不影响 API 和 Agent 层。
+
+**Q: 如何接入真实的 IoT 平台？**
+
+A: 在 `.env` 中配置 `IOT_BASE_URL` 和 `IOT_API_KEY`，系统会自动使用 `IoTClient` 调用真实接口。MCP 工具层不需要任何改动。
+
+**Q: 项目有测试吗？**
+
+A: `requirements.txt` 已包含 pytest 等测试依赖。测试目录结构建议：`tests/api/`（接口测试）、`tests/agents/`（Agent 测试）、`tests/mcp/`（工具测试）。可使用 `pytest tests/ -v --asyncio-mode=auto` 运行。
+
+---
+
+## 十、开发规范
 
 ```bash
-#!/bin/sh -e
-set -x
+# 代码格式化
+ruff format app/
 
-ruff check --fix src
-ruff format src
+# Lint 检查
+ruff check app/
+
+# 运行测试
+pytest tests/ -v --asyncio-mode=auto
+
+# 启动开发服务
+uvicorn app.main:app --reload --port 8000
 ```
 
-## 额外部分
+---
 
-一些非常善良的人分享了他们自己的经验和最佳实践，绝对值得一读。
-
-查看项目的[issues（问题）](https://github.com/zhanymkanov/fastapi-best-practices/issues)部分。
-
-例如，[lowercase00](https://github.com/zhanymkanov/fastapi-best-practices/issues/4)详细描述了他们在权限和认证、基于类的服务和视图、任务队列、自定义响应序列化器、使用dynaconf进行配置等方面的最佳实践。
-
-如果你有关于使用FastAPI的经验要分享，无论是好是坏，都非常欢迎创建一个新的issue。我们很乐意阅读它。
+> 📧 如有问题或建议，欢迎提 Issue 或 PR。
+>
+> ⚠️ 本项目为 Demo 演示版本，生产环境使用前请修改默认的 JWT_SECRET 和 API Key 配置。

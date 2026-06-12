@@ -1,0 +1,34 @@
+# Python
+__pycache__
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+*.log
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+htmlcov/
+.coverage
+
+# IDE
+.vscode/
+.idea/
+
+# Git
+.git/
+.gitignore
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose*.yml
+
+# Environment
+.env
+.env.local
+
+# Docs
+*.md
+images/
+fastapi-best-practices/

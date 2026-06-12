@@ -1,0 +1,77 @@
+name: Test Backend
+
+on:
+  push:
+    branches:
+      - master
+      - main
+  pull_request:
+    types:
+      - opened
+      - synchronize
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  test-backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    services:
+      mongodb:
+        image: mongo:8
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --eval 'db.adminCommand(\"ping\")'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:8-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio pytest-cov httpx
+
+      - name: Run tests
+        env:
+          MONGODB_URL: mongodb://localhost:27017
+          MONGODB_DB_NAME: test_petchill
+          REDIS_URL: redis://localhost:6379/0
+          JWT_SECRET: test-secret-for-ci
+          JWT_ALGORITHM: HS256
+          DEPLOY_MODE: dev
+          APP_NAME: PetChill Test
+          APP_VERSION: "0.1.0"
+        run: |
+          pytest tests/ -v --cov=app --cov-report=term-missing --cov-report=html --cov-fail-under=70
+
+      - name: Store coverage files
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-html
+          path: htmlcov
+          include-hidden-files: true
