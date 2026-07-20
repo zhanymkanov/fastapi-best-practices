@@ -4,6 +4,8 @@
 
 在过去几年的生产实践中，我们做过一些好的和不好的决策，这些决策极大地影响了开发者体验。其中一些经验值得分享。
 
+> **正在与AI智能体协作？** 请参阅[AGENTS.md](./AGENTS.md)，其中以简洁、机器可读的形式整理了相同规则，并附有版本矩阵、该做与不该做的事项以及反模式检查清单。
+
 ## 目录
 - [Fast Api最佳实践指南](#fast-api最佳实践指南)
   - [目录](#目录)
@@ -24,12 +26,15 @@
     - [遵循REST规范](#遵循rest规范)
     - [FastAPI响应序列化](#fastapi响应序列化)
     - [如果必须使用同步SDK，请在线程池中运行它。](#如果必须使用同步sdk请在线程池中运行它)
+    - [BackgroundTasks与真正的任务队列](#backgroundtasks与真正的任务队列)
     - [ValueErrors可能会变成Pydantic ValidationError](#valueerrors可能会变成pydantic-validationerror)
     - [文档](#文档)
-    - [迁移工具Alembic](#迁移工具alembic)
     - [设置数据库键命名约定](#设置数据库键命名约定)
+    - [迁移工具Alembic](#迁移工具alembic)
+    - [设置数据库命名约定](#设置数据库命名约定)
     - [SQL优先，Pydantic次之](#sql优先pydantic次之)
     - [从一开始就设置异步测试客户端](#从一开始就设置异步测试客户端)
+      - [在测试中覆盖依赖项](#在测试中覆盖依赖项)
     - [使用ruff](#使用ruff)
   - [额外部分](#额外部分)
   
@@ -576,6 +581,30 @@ async def call_my_sync_library():
     await run_in_threadpool(client.make_request, data=my_data)
 ```
 
+### BackgroundTasks与真正的任务队列
+
+FastAPI的`BackgroundTasks`很方便，但使用不当也容易出问题。任务会在**响应发送后，在同一个工作进程中**运行。如果工作进程终止，任务也会丢失；它没有重试、可观测性或调度能力。
+
+| 适合使用`BackgroundTasks`的情况 | 适合使用Celery / Arq / RQ的情况 |
+|---|---|
+| 任务很短（少于1秒） | 任务需要数秒到数分钟 |
+| 失败可以被忽略 | 需要重试或死信处理 |
+| 任务在进程内执行（发送邮件、写入一条日志） | CPU密集型任务或需要独立工作进程池 |
+| 不需要调度或速率限制 | 需要定时、延迟执行或速率限制 |
+
+```python
+from fastapi import BackgroundTasks
+
+
+@router.post("/signup")
+async def signup(data: SignupIn, bg: BackgroundTasks):
+    user = await service.create_user(data)
+    bg.add_task(send_welcome_email, user.email)  # 即发即弃，在进程内执行
+    return user
+```
+
+经验法则：如果任务丢失会严重到需要通知值班人员，它就不应该放在`BackgroundTasks`中。
+
 ### ValueErrors可能会变成Pydantic ValidationError
 
 如果你在直接面向客户端的Pydantic模式中引发`ValueError`，它将向用户返回一个详细的响应。
@@ -674,7 +703,7 @@ async def documented_route():
 
 <img src="images/custom_responses.png" width="400" height="auto">
 
-**设置数据库键命名约定**
+### 设置数据库键命名约定
 
 根据数据库的约定显式设置索引命名比使用sqlalchemy的默认命名方式更好。
 
@@ -702,7 +731,7 @@ metadata = MetaData(naming_convention=POSTGRES_INDEXES_NAMING_CONVENTION)
 file_template = %%(year)d-%%(month).2d-%%(day).2d_%%(slug)s
 ```
 
-### 设置数据库键命名约定
+### 设置数据库命名约定
 
 保持名称的一致性很重要。我们遵循的一些规则：
 
@@ -824,6 +853,26 @@ async def test_create_post(client: AsyncClient):
     resp = await client.post("/posts")
 
     assert resp.status_code == 201
+```
+
+#### 在测试中覆盖依赖项
+
+不要对内部实现使用monkeypatch。FastAPI的`dependency_overrides`可以将任意依赖项替换为测试替身，例如身份验证、外部客户端以及任何不希望在测试中访问网络的依赖项。
+
+```python
+from src.auth.dependencies import parse_jwt_data
+from src.main import app
+
+
+def fake_user():
+    return {"user_id": "00000000-0000-0000-0000-000000000001"}
+
+
+@pytest.fixture(autouse=True)
+def _override_auth():
+    app.dependency_overrides[parse_jwt_data] = fake_user
+    yield
+    app.dependency_overrides.clear()
 ```
 
 除非你有同步数据库连接（抱歉？）或者不打算编写集成测试。
