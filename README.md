@@ -39,6 +39,7 @@ Here are some lessons worth sharing.
   - [Set tests client async from day 0](#set-tests-client-async-from-day-0)
   - [Use ruff](#use-ruff)
 - [Bonus Section](#bonus-section)
+- [License](#license)
 
 ## Project Structure
 There are many ways to structure a project, but the best structure is one that is consistent, straightforward, and free of surprises.
@@ -869,3 +870,16 @@ task queues, custom response serializers, configuration with dynaconf, etc.
 
 If you have something to share about your experience working with FastAPI, whether it's good or bad, 
 you are very welcome to create a new issue. It is our pleasure to read it. 
+
+## License
+
+This project is licensed under the [Apache License 2.0](./LICENSE). You may use,
+modify, and distribute it, including commercially, subject to the license terms.
+Redistributions must preserve the applicable attribution from [NOTICE](./NOTICE)
+and mark modified files as required by the license.
+
+Suggested attribution:
+
+> Based on [FastAPI Best Practices](https://github.com/zhanymkanov/fastapi-best-practices)
+> by Yerassyl Zhanymkanov, licensed under the
+> [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0).

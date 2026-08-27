@@ -32,6 +32,7 @@
     - [从一开始就设置异步测试客户端](#从一开始就设置异步测试客户端)
     - [使用ruff](#使用ruff)
   - [额外部分](#额外部分)
+  - [许可证](#许可证)
   
 ## 项目结构
 
@@ -853,3 +854,11 @@ ruff format src
 例如，[lowercase00](https://github.com/zhanymkanov/fastapi-best-practices/issues/4)详细描述了他们在权限和认证、基于类的服务和视图、任务队列、自定义响应序列化器、使用dynaconf进行配置等方面的最佳实践。
 
 如果你有关于使用FastAPI的经验要分享，无论是好是坏，都非常欢迎创建一个新的issue。我们很乐意阅读它。
+
+## 许可证
+
+本项目采用 [Apache License 2.0](./LICENSE)。任何人均可在遵守许可证条款的前提下使用、修改和分发本项目，包括商业用途。重新分发时，必须按许可证要求保留 [NOTICE](./NOTICE) 中适用的署名信息，并在修改过的文件中作出说明。
+
+建议的署名方式：
+
+> 本作品基于 Yerassyl Zhanymkanov 的 [FastAPI Best Practices](https://github.com/zhanymkanov/fastapi-best-practices)，采用 [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0) 许可。
